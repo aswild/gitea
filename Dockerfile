@@ -17,16 +17,16 @@ RUN apk --no-cache add \
     gettext \
     tzdata
 RUN addgroup \
-    -S -g 1000 \
+    -S -g 995 \
     git && \
   adduser \
     -S -H -D \
     -h /data/git \
     -s /bin/bash \
-    -u 1000 \
+    -u 995 \
     -G git \
     git && \
-  echo "git:$(dd if=/dev/urandom bs=24 count=1 status=none | base64)" | chpasswd
+  echo "git:$(dd if=/dev/urandom bs=24 count=1 status=none 2>/dev/null | base64)" | chpasswd
 
 ENV USER git
 ENV GITEA_CUSTOM /data/gitea
