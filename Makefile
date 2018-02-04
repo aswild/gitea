@@ -44,12 +44,12 @@ GOFMT ?= gofmt -s
 GOFLAGS := -i -v
 EXTRA_GOFLAGS ?=
 
+TAGS ?= bindata sqlite
+
 LDFLAGS := -X "main.Version=$(shell git describe --tags --always | sed 's/-/+/' | sed 's/^v//')" -X "main.Tags=$(TAGS)"
 
 PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations,$(shell $(GO) list ./... | grep -v /vendor/))
 SOURCES ?= $(shell find . -name "*.go" -type f)
-
-TAGS ?=
 
 TMPDIR := $(shell mktemp -d 2>/dev/null || mktemp -d -t 'gitea-temp')
 
