@@ -38,7 +38,7 @@ else
 endif
 
 BINDATA := modules/{options,public,templates}/bindata.go
-DOCKER_TAG := gitea/gitea:latest
+DOCKER_TAG := awild/gitea:latest
 GOFILES := $(shell find . -name "*.go" -type f ! -path "./vendor/*" ! -path "*/bindata.go")
 GOFMT ?= gofmt -s
 
