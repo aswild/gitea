@@ -1,6 +1,6 @@
 #Makefile related to docker
 
-DOCKER_IMAGE ?= gitea/gitea
+DOCKER_IMAGE ?= awild/gitea
 DOCKER_TAG ?= latest
 DOCKER_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
