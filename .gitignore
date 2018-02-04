@@ -28,6 +28,7 @@ _testmain.go
 *.exe
 *.test
 *.prof
+*.swp
 
 *coverage.out
 coverage.all
