@@ -21,7 +21,7 @@ RUN if [ -n "${GITEA_VERSION}" ]; then git checkout "${GITEA_VERSION}"; fi \
 FROM alpine:3.7
 LABEL maintainer="maintainers@gitea.io"
 
-EXPOSE 22 3000
+EXPOSE 22
 
 RUN apk --no-cache add \
     bash \
