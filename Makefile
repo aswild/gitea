@@ -1,3 +1,26 @@
+# go does parallel building on its own, disable it for make
+.NOTPARALLEL:
+
+# this hack lets us have the gitea source outside GOPATH
+# with a symlink to make go happy
+GOPATH ?= $(HOME)/go
+GOPATH_GITEADIR = $(GOPATH)/src/code.gitea.io/gitea
+
+ifneq ($(PWD),$(GOPATH_GITEADIR))
+
+export PATH := $(PATH):$(GOPATH)/bin
+
+.PHONY: redirect
+redirect:
+	@test -e $(GOPATH_GITEADIR) || ( \
+		echo "Creating symlink in GOPATH:"; \
+		ln -sv $(PWD) $(GOPATH_GITEADIR) )
+	cd $(GOPATH_GITEADIR) && $(MAKE) --no-print-directory $(MAKECMDGOALS)
+
+$(MAKECMDGOALS): redirect
+
+else # PWD == GOPATH_GITEADIR
+
 DIST := dist
 IMPORT := code.gitea.io/gitea
 
@@ -327,3 +350,5 @@ generate-images:
 					$(TMPDIR)/images/64.png $(TMPDIR)/images/128.png \
 					$(PWD)/public/img/favicon.ico
 	rm -rf $(TMPDIR)/images
+
+endif # PWD == GOPATH_GITEADIR
