@@ -2,7 +2,7 @@ FROM alpine:3.6
 
 LABEL maintainer="The Gitea Authors"
 
-EXPOSE 22 3000
+EXPOSE 22
 
 RUN apk --no-cache add \
     su-exec \
