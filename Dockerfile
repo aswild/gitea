@@ -29,7 +29,6 @@ RUN apk --no-cache add \
     curl \
     gettext \
     git \
-    linux-pam \
     openssh \
     s6 \
     sqlite \
