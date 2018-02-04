@@ -7,10 +7,8 @@ EXPOSE 22
 RUN apk --no-cache add \
     su-exec \
     ca-certificates \
-    sqlite \
     bash \
     git \
-    linux-pam \
     s6 \
     curl \
     openssh \
