@@ -46,7 +46,7 @@ EXTRA_GOFLAGS ?=
 
 TAGS ?= sqlite
 
-LDFLAGS := -X "main.Version=$(shell git describe --tags --always | sed 's/-/+/' | sed 's/^v//')" -X "main.Tags=$(TAGS)"
+LDFLAGS := -X "main.Version=$(shell git describe --tags --always --dirty=+ | sed 's/-/+/; s/^v//')" -X "main.Tags=$(TAGS)"
 
 PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations,$(shell $(GO) list ./... | grep -v /vendor/))
 SOURCES ?= $(shell find . -name "*.go" -type f)
