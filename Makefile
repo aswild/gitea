@@ -14,7 +14,7 @@ export PATH := $(PATH):$(GOPATH)/bin
 redirect:
 	@test -e $(GOPATH_GITEADIR) || ( \
 		echo "Creating symlink in GOPATH:"; \
-		ln -sv $(PWD) $(GOPATH_GITEADIR) )
+		mkdir -p $(shell dirname $(GOPATH_GITEADIR)) && ln -sv $(PWD) $(GOPATH_GITEADIR) )
 	cd $(GOPATH_GITEADIR) && $(MAKE) --no-print-directory $(MAKECMDGOALS)
 
 $(MAKECMDGOALS): redirect
