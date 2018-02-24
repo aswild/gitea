@@ -40,7 +40,7 @@ RUN addgroup \
     git && \
   adduser \
     -S -H -D \
-    -h /data/git \
+    -h /data/gitea/git \
     -s /bin/bash \
     -u 995 \
     -G git \
