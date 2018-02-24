@@ -2179,6 +2179,7 @@ func GitFsck() {
 						return nil
 					}
 				}
+				log.Trace(fmt.Sprintf("Running health check for repository %s", repoFullName))
 				repoPath := repo.RepoPath()
 				if err := git.Fsck(repoPath, setting.Cron.RepoHealthCheck.Timeout, setting.Cron.RepoHealthCheck.Args...); err != nil {
 					desc := fmt.Sprintf("Failed to health check repository (%s): %v", repoPath, err)
@@ -2191,6 +2192,7 @@ func GitFsck() {
 			}); err != nil {
 		log.Error(4, "GitFsck: %v", err)
 	}
+	log.Trace("Finished: GitFsck")
 }
 
 // GitGcRepos calls 'git gc' to remove unnecessary files and optimize the local repository
