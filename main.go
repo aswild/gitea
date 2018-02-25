@@ -35,8 +35,6 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "Gitea"
 	app.Usage = "A painless self-hosted Git service"
-	app.Description = `By default, gitea will start serving using the webserver with no
-arguments - which can alternatively be run by running the subcommand web.`
 	app.Version = Version + formatBuiltWith(Tags)
 	app.Commands = []cli.Command{
 		cmd.CmdWeb,
@@ -47,7 +45,6 @@ arguments - which can alternatively be run by running the subcommand web.`
 		cmd.CmdAdmin,
 	}
 	app.Flags = append(app.Flags, []cli.Flag{}...)
-	app.Action = cmd.CmdWeb.Action
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(4, "Failed to run app with %s: %v", os.Args, err)
