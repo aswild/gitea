@@ -44,7 +44,7 @@ GOFMT ?= gofmt -s
 GOFLAGS := -i -v
 EXTRA_GOFLAGS ?=
 
-TAGS ?= bindata sqlite
+TAGS ?= sqlite
 
 LDFLAGS := -X "main.Version=$(shell git describe --tags --always --dirty=+ | sed 's/-/+/; s/^v//')" -X "main.Tags=$(TAGS)"
 
