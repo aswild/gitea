@@ -380,7 +380,6 @@ var (
 			Schedule   string
 			Timeout    time.Duration
 			Args       []string `delim:" "`
-			SkipRepos  []string `delim:" "`
 		} `ini:"cron.repo_health_check"`
 		CheckRepoStats struct {
 			Enabled    bool
@@ -421,7 +420,6 @@ var (
 			Schedule   string
 			Timeout    time.Duration
 			Args       []string `delim:" "`
-			SkipRepos  []string `delim:" "`
 		}{
 			Enabled:    true,
 			RunAtStart: false,
