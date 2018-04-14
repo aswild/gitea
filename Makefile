@@ -1,3 +1,26 @@
+# go does parallel building on its own, disable it for make
+.NOTPARALLEL:
+
+# this hack lets us have the gitea source outside GOPATH
+# with a symlink to make go happy
+GOPATH ?= $(HOME)/go
+GOPATH_GITEADIR = $(GOPATH)/src/code.gitea.io/gitea
+
+ifneq ($(PWD),$(GOPATH_GITEADIR))
+
+export PATH := $(PATH):$(GOPATH)/bin
+
+.PHONY: redirect
+redirect:
+	@test -e $(GOPATH_GITEADIR) || ( \
+		echo "Creating symlink in GOPATH:"; \
+		mkdir -p $(shell dirname $(GOPATH_GITEADIR)) && ln -sv $(PWD) $(GOPATH_GITEADIR) )
+	cd $(GOPATH_GITEADIR) && $(MAKE) --no-print-directory $(MAKECMDGOALS)
+
+$(MAKECMDGOALS): redirect
+
+else # PWD == GOPATH_GITEADIR
+
 DIST := dist
 IMPORT := code.gitea.io/gitea
 
@@ -21,12 +44,12 @@ GOFMT ?= gofmt -s
 GOFLAGS := -i -v
 EXTRA_GOFLAGS ?=
 
-LDFLAGS := -X "main.Version=$(shell git describe --tags --always | sed 's/-/+/' | sed 's/^v//')" -X "main.Tags=$(TAGS)"
+TAGS ?= sqlite
+
+LDFLAGS := -X "main.Version=$(shell git describe --tags --always --dirty=+ | sed 's/-/+/; s/^v//')" -X "main.Tags=$(TAGS)"
 
 PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations,$(shell $(GO) list ./... | grep -v /vendor/))
 SOURCES ?= $(shell find . -name "*.go" -type f)
-
-TAGS ?=
 
 TMPDIR := $(shell mktemp -d 2>/dev/null || mktemp -d -t 'gitea-temp')
 
@@ -327,3 +350,5 @@ generate-images:
 					$(TMPDIR)/images/64.png $(TMPDIR)/images/128.png \
 					$(PWD)/public/img/favicon.ico
 	rm -rf $(TMPDIR)/images
+
+endif # PWD == GOPATH_GITEADIR

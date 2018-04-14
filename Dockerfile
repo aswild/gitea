@@ -21,7 +21,7 @@ RUN if [ -n "${GITEA_VERSION}" ]; then git checkout "${GITEA_VERSION}"; fi \
 FROM alpine:3.7
 LABEL maintainer="maintainers@gitea.io"
 
-EXPOSE 22 3000
+EXPOSE 22
 
 RUN apk --no-cache add \
     bash \
@@ -29,7 +29,6 @@ RUN apk --no-cache add \
     curl \
     gettext \
     git \
-    linux-pam \
     openssh \
     s6 \
     sqlite \
@@ -37,16 +36,16 @@ RUN apk --no-cache add \
     tzdata
 
 RUN addgroup \
-    -S -g 1000 \
+    -S -g 995 \
     git && \
   adduser \
     -S -H -D \
-    -h /data/git \
+    -h /data/gitea/git \
     -s /bin/bash \
-    -u 1000 \
+    -u 995 \
     -G git \
     git && \
-  echo "git:$(dd if=/dev/urandom bs=24 count=1 status=none | base64)" | chpasswd
+  echo "git:$(dd if=/dev/urandom bs=24 count=1 status=none 2>/dev/null | base64)" | chpasswd
 
 ENV USER git
 ENV GITEA_CUSTOM /data/gitea
