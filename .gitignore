@@ -59,4 +59,5 @@ coverage.all
 /integrations/indexers-sqlite
 /integrations/mysql.ini
 /integrations/pgsql.ini
+/routers/repo/authorized_keys
 /node_modules
