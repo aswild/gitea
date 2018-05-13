@@ -2,5 +2,5 @@
 [[ -f ./setup ]] && source ./setup
 
 pushd /root > /dev/null
-    exec su-exec root /sbin/syslogd -nS -O-
+    exec su-exec root /sbin/syslogd -nS -O/data/gitea/log/sshd.log -s1024 -b99
 popd
