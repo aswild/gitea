@@ -19,6 +19,25 @@ import (
 	api "code.gitea.io/sdk/gitea"
 )
 
+var SearchOrderByMap = [2]map[string]models.SearchOrderBy{
+	map[string]models.SearchOrderBy{
+		// order == 0, ascending (default)
+		"alpha":   models.SearchOrderByAlphabetically,
+		"created": models.SearchOrderByOldest,
+		"updated": models.SearchOrderByLeastUpdated,
+		"size":    models.SearchOrderBySize,
+		"id":      models.SearchOrderByID,
+	},
+	map[string]models.SearchOrderBy{
+		// order == 1, descending
+		"alpha":   models.SearchOrderByAlphabeticallyReverse,
+		"created": models.SearchOrderByNewest,
+		"updated": models.SearchOrderByRecentUpdated,
+		"size":    models.SearchOrderBySizeReverse,
+		"id":      models.SearchOrderByIDReverse,
+	},
+}
+
 // Search repositories via options
 func Search(ctx *context.APIContext) {
 	// swagger:operation GET /repos/search repository repoSearch
@@ -52,6 +71,17 @@ func Search(ctx *context.APIContext) {
 	//   in: query
 	//   description: if `uid` is given, search only for repos that the user owns
 	//   type: boolean
+	// - name: sort
+	//   in: query
+	//   description: sort repos by attribute. Supported values are
+	//                "alpha", "created", "updated", "size", and "id".
+	//                Default is "alpha"
+	//   type: string
+	// - name: order
+	//   in: query
+	//   description: sort order. 0 for ascending, 1 for descending.
+	//                Default is ascending
+	//   type: integer
 	// responses:
 	//   "200":
 	//     "$ref": "#/responses/SearchResults"
@@ -85,6 +115,22 @@ func Search(ctx *context.APIContext) {
 	default:
 		ctx.Error(http.StatusUnprocessableEntity, "", fmt.Errorf("Invalid search mode: \"%s\"", mode))
 		return
+	}
+
+	var sortMode = ctx.Query("sort")
+	if len(sortMode) > 0 {
+		var sortOrder = ctx.QueryInt("order") // will default to 0, i.e. ascending
+		if sortOrder < 0 || sortOrder > 1 {
+			ctx.Error(http.StatusUnprocessableEntity, "", fmt.Errorf("Invalid sort order: \"%d\"", sortOrder))
+			return
+		}
+
+		if orderBy, ok := SearchOrderByMap[sortOrder][sortMode]; ok {
+			opts.OrderBy = orderBy
+		} else {
+			ctx.Error(http.StatusUnprocessableEntity, "", fmt.Errorf("Invalid sort mode: \"%s\"", sortMode))
+			return
+		}
 	}
 
 	var err error
