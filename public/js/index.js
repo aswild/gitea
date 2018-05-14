@@ -1839,7 +1839,9 @@ function initVueComponents(){
                 return this.repos.length > 0 && this.repos.length < this.repoTypes[this.reposFilter].count;
             },
             searchURL: function() {
-                return this.suburl + '/api/v1/repos/search?uid=' + this.uid + '&q=' + this.searchQuery + '&limit=' + this.searchLimit + '&mode=' + this.repoTypes[this.reposFilter].searchMode + (this.reposFilter !== 'all' ? '&exclusive=1' : '');
+                return this.suburl + '/api/v1/repos/search?sort=updated&order=1&uid=' + this.uid + '&q=' + this.searchQuery
+                                   + '&limit=' + this.searchLimit + '&mode=' + this.repoTypes[this.reposFilter].searchMode
+                                   + (this.reposFilter !== 'all' ? '&exclusive=1' : '');
             },
             repoTypeCount: function() {
                 return this.repoTypes[this.reposFilter].count;
