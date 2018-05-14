@@ -44,6 +44,7 @@ type InstallForm struct {
 	EnableOpenIDSignIn             bool
 	EnableOpenIDSignUp             bool
 	DisableRegistration            bool
+	AllowOnlyExternalRegistration  bool
 	EnableCaptcha                  bool
 	RequireSignInView              bool
 	DefaultKeepEmailPrivate        bool
@@ -109,6 +110,7 @@ type UpdateProfileForm struct {
 	KeepEmailPrivate bool
 	Website          string `binding:"ValidUrl;MaxSize(255)"`
 	Location         string `binding:"MaxSize(50)"`
+	Language         string `binding:"Size(5)"`
 }
 
 // Validate validates the fields
