@@ -1806,7 +1806,7 @@ function initVueComponents(){
                 tab: 'repos',
                 repos: [],
                 reposTotalCount: 0,
-                reposFilter: 'all',
+                reposFilter: 'sources',
                 searchQuery: '',
                 isLoading: false,
                 repoTypes: {
