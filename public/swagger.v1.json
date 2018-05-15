@@ -923,8 +923,8 @@
             "in": "query"
           },
           {
-            "type": "integer",
-            "description": "sort order. 0 for ascending, 1 for descending. Default is ascending",
+            "type": "string",
+            "description": "sort order, either \"asc\" (ascending) or \"desc\" (descending). Default is \"asc\", ignored unless \"sort\" is also specified.",
             "name": "order",
             "in": "query"
           }
