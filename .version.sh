@@ -8,15 +8,13 @@ if ( echo "$codeversion" | grep -q "$gitversion" ); then
     git describe --tags --always --dirty=+ | sed 's/-/+/; s/^v//'
 else
     # working off master, use branch name and rev count
-    branch=`git symbolic-ref HEAD | sed -n 's:^refs/heads/::p'` || true
+    branch=`git symbolic-ref HEAD 2>/dev/null | sed -n 's:^refs/heads/::p'` || true
+    [ -z "$branch" ] || branch="-$branch"
     sha=`git rev-parse --short HEAD`
+    revcount=`git rev-list HEAD | wc -l`
     dirty=
     if [ -n "`git status --porcelain --untracked=no`" ]; then
         dirty="+"
     fi
-    if [ -n "$branch" ]; then
-        echo "${codeversion}-${branch}-g${sha}${dirty}"
-    else
-        echo "${codeversion}-g${sha}${dirty}"
-    fi
+    echo "${codeversion}${branch}-${revcount}-g${sha}${dirty}"
 fi
