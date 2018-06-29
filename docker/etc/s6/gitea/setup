@@ -1,7 +1,5 @@
 #!/bin/bash
 
-/usr/sbin/update-ca-certificates
-
 if [ ! -d /data/gitea/git/.ssh ]; then
     mkdir -p /data/gitea/git/.ssh
     chmod 700 /data/gitea/git/.ssh
