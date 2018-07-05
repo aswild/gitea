@@ -5,6 +5,7 @@ FROM golang:1.10-alpine3.7 AS build-env
 
 ARG GITEA_VERSION
 ARG TAGS="sqlite"
+ARG VERSION
 ENV TAGS "bindata $TAGS"
 
 #Build deps
@@ -16,7 +17,7 @@ WORKDIR ${GOPATH}/src/code.gitea.io/gitea
 
 #Checkout version if set
 RUN if [ -n "${GITEA_VERSION}" ]; then git checkout "${GITEA_VERSION}"; fi \
- && make clean generate build
+ && make VERSION="${VERSION}" clean generate build
 
 FROM alpine:3.7
 LABEL maintainer="maintainers@gitea.io"

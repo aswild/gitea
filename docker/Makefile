@@ -7,7 +7,7 @@ DOCKER_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
 .PHONY: docker
 docker:
-	docker build --disable-content-trust=false -t $(DOCKER_REF) .
+	docker build --disable-content-trust=false --build-arg VERSION="$(VERSION)" -t $(DOCKER_REF) .
 # support also build args docker build --build-arg GITEA_VERSION=v1.2.3 --build-arg TAGS="bindata sqlite"  .
 
 .PHONY: docker-build
