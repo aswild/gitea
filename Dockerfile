@@ -32,7 +32,6 @@ RUN apk --no-cache add \
     git \
     openssh \
     s6 \
-    sqlite \
     su-exec \
     tzdata
 
