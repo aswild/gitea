@@ -57,3 +57,4 @@ CMD ["/bin/s6-svscan", "/etc/s6"]
 
 COPY docker /
 COPY --from=build-env /go/src/code.gitea.io/gitea/gitea /app/gitea/gitea
+RUN ln -s /app/gitea/gitea /usr/local/bin/gitea
