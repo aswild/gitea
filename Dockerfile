@@ -3,13 +3,13 @@
 #Build stage
 FROM golang:1.10-alpine3.7 AS build-env
 
+#Build deps
+RUN apk --no-cache add build-base git
+
 ARG GITEA_VERSION
 ARG TAGS="sqlite"
 ARG VERSION
 ENV TAGS "bindata $TAGS"
-
-#Build deps
-RUN apk --no-cache add build-base git
 
 #Setup repo
 COPY . ${GOPATH}/src/code.gitea.io/gitea
