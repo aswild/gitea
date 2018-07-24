@@ -63,7 +63,7 @@ LDFLAGS = -X "main.Version=$(GITEA_VERSION)" -X "main.Tags=$(TAGS)"
 PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations,$(shell $(GO) list ./... | grep -v /vendor/))
 SOURCES ?= $(shell find . -name "*.go" -type f)
 
-TMPDIR := $(shell mktemp -d 2>/dev/null || mktemp -d -t 'gitea-temp')
+TMPDIR := ./build-tmp
 
 TEST_MYSQL_HOST ?= mysql:3306
 TEST_MYSQL_DBNAME ?= testgitea
@@ -337,8 +337,11 @@ stylesheets-check: generate-stylesheets
 generate-stylesheets:
 	node_modules/.bin/lessc --clean-css public/less/index.less public/css/index.css
 
+$(TMPDIR):
+	mkdir -p $@
+
 .PHONY: swagger-ui
-swagger-ui:
+swagger-ui: $(TMPDIR)
 	rm -Rf public/vendor/assets/swagger-ui
 	git clone --depth=10 -b v3.13.4 --single-branch https://github.com/swagger-api/swagger-ui.git $(TMPDIR)/swagger-ui
 	mv $(TMPDIR)/swagger-ui/dist public/vendor/assets/swagger-ui
@@ -356,7 +359,7 @@ update-translations:
 	rmdir ./translations
 
 .PHONY: generate-images
-generate-images:
+generate-images: $(TMPDIR)
 	mkdir -p $(TMPDIR)/images
 	inkscape -f $(PWD)/assets/logo.svg -w 880 -h 880 -e $(PWD)/public/img/gitea-lg.png
 	inkscape -f $(PWD)/assets/logo.svg -w 120 -h 120 -jC -i layer1 -e $(TMPDIR)/images/sm-1.png
