@@ -20,17 +20,15 @@ import (
 	api "code.gitea.io/sdk/gitea"
 )
 
-var searchOrderByMap = [2]map[string]models.SearchOrderBy{
-	{
-		// order == 0, ascending (default)
+var searchOrderByMap = map[string]map[string]models.SearchOrderBy{
+	"asc": {
 		"alpha":   models.SearchOrderByAlphabetically,
 		"created": models.SearchOrderByOldest,
 		"updated": models.SearchOrderByLeastUpdated,
 		"size":    models.SearchOrderBySize,
 		"id":      models.SearchOrderByID,
 	},
-	{
-		// order == 1, descending
+	"desc": {
 		"alpha":   models.SearchOrderByAlphabeticallyReverse,
 		"created": models.SearchOrderByNewest,
 		"updated": models.SearchOrderByRecentUpdated,
@@ -81,7 +79,7 @@ func Search(ctx *context.APIContext) {
 	// - name: order
 	//   in: query
 	//   description: sort order, either "asc" (ascending) or "desc" (descending).
-	//                Default is "asc", ignored unless "sort" is also specified.
+	//                Default is "asc", ignored if "sort" is not specified.
 	//   type: string
 	// responses:
 	//   "200":
@@ -121,23 +119,18 @@ func Search(ctx *context.APIContext) {
 	var sortMode = ctx.Query("sort")
 	if len(sortMode) > 0 {
 		var sortOrder = ctx.Query("order")
-		var sortOrderIdx int
-		switch sortOrder {
-		case "":
-			sortOrderIdx = 0
-		case "asc":
-			sortOrderIdx = 0
-		case "desc":
-			sortOrderIdx = 1
-		default:
-			ctx.Error(http.StatusUnprocessableEntity, "", fmt.Errorf("Invalid sort order: \"%s\"", sortOrder))
-			return
+		if len(sortOrder) == 0 {
+			sortOrder = "asc"
 		}
-
-		if orderBy, ok := searchOrderByMap[sortOrderIdx][sortMode]; ok {
-			opts.OrderBy = orderBy
+		if searchModeMap, ok := searchOrderByMap[sortOrder]; ok {
+			if orderBy, ok := searchModeMap[sortMode]; ok {
+				opts.OrderBy = orderBy
+			} else {
+				ctx.Error(http.StatusUnprocessableEntity, "", fmt.Errorf("Invalid sort mode: \"%s\"", sortMode))
+				return
+			}
 		} else {
-			ctx.Error(http.StatusUnprocessableEntity, "", fmt.Errorf("Invalid sort mode: \"%s\"", sortMode))
+			ctx.Error(http.StatusUnprocessableEntity, "", fmt.Errorf("Invalid sort order: \"%s\"", sortOrder))
 			return
 		}
 	}
