@@ -3,7 +3,7 @@
 codeversion=`sed -n 's/^var Version.*"\([^"]\+\).*/\1/p' main.go`
 gitversion=`git describe --tags --abbrev=0 | sed 's/v\([^-]\+\).*/\1/'`
 
-if ( echo "$codeversion" | grep -q "$gitversion" ); then
+if [[ $codeversion == 1.5.0-dev ]] || ( echo "$codeversion" | grep -q "$gitversion" ); then
     # on a release branch use the usual format
     git describe --tags --always --dirty=+ | sed 's/-/+/; s/^v//'
 else
