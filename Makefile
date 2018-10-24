@@ -44,7 +44,7 @@ GOFMT ?= gofmt -s
 GOFLAGS := -i -v
 EXTRA_GOFLAGS ?=
 
-TAGS ?= sqlite
+TAGS ?= sqlite sqlite_unlock_notify
 
 ifneq ($(DRONE_TAG),)
 	VERSION ?= $(subst v,,$(DRONE_TAG))
