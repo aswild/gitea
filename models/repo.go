@@ -681,7 +681,7 @@ func (repo *Repository) IsOwnedBy(userID int64) bool {
 }
 
 func (repo *Repository) updateSize(e Engine) error {
-	repoInfoSize, err := git.GetRepoSize(repo.RepoPath())
+	repoInfoSize, err := git.GetRepoSize(repo.repoPath(e))
 	if err != nil {
 		return fmt.Errorf("UpdateSize: %v", err)
 	}
@@ -1035,7 +1035,6 @@ func MigrateRepository(doer, u *User, opts MigrateRepoOptions) (*Repository, err
 		if err = SyncReleasesWithTags(repo, gitRepo); err != nil {
 			log.Error(4, "Failed to synchronize tags to releases for repository: %v", err)
 		}
-		UpdateRepoIndexer(repo)
 	}
 
 	if err = repo.UpdateSize(); err != nil {
@@ -1053,10 +1052,16 @@ func MigrateRepository(doer, u *User, opts MigrateRepoOptions) (*Repository, err
 		}
 
 		repo.IsMirror = true
-		return repo, UpdateRepository(repo, false)
+		err = UpdateRepository(repo, false)
+	} else {
+		repo, err = CleanUpMigrateInfo(repo)
 	}
 
-	return CleanUpMigrateInfo(repo)
+	if err != nil && !repo.IsBare {
+		UpdateRepoIndexer(repo)
+	}
+
+	return repo, err
 }
 
 // cleanUpMigrateGitConfig removes mirror info which prevents "push --all".
@@ -1709,7 +1714,7 @@ func updateRepository(e Engine, repo *Repository, visibilityChanged bool) (err e
 		}
 
 		// Create/Remove git-daemon-export-ok for git-daemon...
-		daemonExportFile := path.Join(repo.RepoPath(), `git-daemon-export-ok`)
+		daemonExportFile := path.Join(repo.repoPath(e), `git-daemon-export-ok`)
 		if repo.IsPrivate && com.IsExist(daemonExportFile) {
 			if err = os.Remove(daemonExportFile); err != nil {
 				log.Error(4, "Failed to remove %s: %v", daemonExportFile, err)
@@ -2459,7 +2464,7 @@ func ForkRepository(doer, u *User, oldRepo *Repository, name, desc string) (_ *R
 	repoPath := RepoPath(u.Name, repo.Name)
 	_, stderr, err := process.GetManager().ExecTimeout(10*time.Minute,
 		fmt.Sprintf("ForkRepository(git clone): %s/%s", u.Name, repo.Name),
-		"git", "clone", "--bare", oldRepo.RepoPath(), repoPath)
+		"git", "clone", "--bare", oldRepo.repoPath(sess), repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("git clone: %v", stderr)
 	}

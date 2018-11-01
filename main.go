@@ -46,7 +46,7 @@ func main() {
 		cmd.CmdAdmin,
 		cmd.CmdGenerate,
 	}
-	app.Flags = append(app.Flags, []cli.Flag{}...)
+	app.Flags = append(app.Flags, cmd.CmdWeb.Flags...)
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(4, "Failed to run app with %s: %v", os.Args, err)
