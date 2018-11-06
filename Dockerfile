@@ -3,13 +3,13 @@
 #Build stage
 FROM golang:1.11-alpine3.8 AS build-env
 
-#Build deps
-RUN apk --no-cache add build-base git
-
 ARG GITEA_VERSION
 ARG TAGS="sqlite sqlite_unlock_notify"
 ARG VERSION
 ENV TAGS "bindata $TAGS"
+
+#Build deps
+RUN apk --no-cache add build-base git
 
 #Setup repo
 COPY . ${GOPATH}/src/code.gitea.io/gitea
