@@ -137,6 +137,11 @@ func Dashboard(ctx *context.Context) {
 		IncludePrivate:  true,
 		OnlyPerformedBy: false,
 		IncludeDeleted:  false,
+		ExcludeTypes:    []models.ActionType{
+			models.ActionMirrorSyncPush,
+			models.ActionMirrorSyncCreate,
+			models.ActionMirrorSyncDelete,
+		},
 	})
 	if ctx.Written() {
 		return
