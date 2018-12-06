@@ -36,6 +36,9 @@ func GetUserHeatmapDataByUser(user *User) ([]*UserHeatmapData, error) {
 		Table("action").
 		Where("user_id = ?", user.ID).
 		And("created_unix > ?", (util.TimeStampNow() - 31536000)).
+		And("op_type <> ?", ActionMirrorSyncPush).
+		And("op_type <> ?", ActionMirrorSyncCreate).
+		And("op_type <> ?", ActionMirrorSyncDelete).
 		GroupBy(groupByName).
 		OrderBy("timestamp").
 		Find(&hdata)

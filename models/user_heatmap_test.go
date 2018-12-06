@@ -35,6 +35,11 @@ func TestGetUserHeatmapDataByUser(t *testing.T) {
 			IncludePrivate:   true,
 			OnlyPerformedBy:  false,
 			IncludeDeleted:   true,
+			ExcludeTypes:    []ActionType{
+				ActionMirrorSyncPush,
+				ActionMirrorSyncCreate,
+				ActionMirrorSyncDelete,
+			},
 		})
 		assert.NoError(t, err)
 
