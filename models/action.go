@@ -813,6 +813,7 @@ type GetFeedsOptions struct {
 	IncludePrivate   bool // include private actions
 	OnlyPerformedBy  bool // only actions performed by requested user
 	IncludeDeleted   bool // include deleted actions
+	ExcludeTypes     []ActionType // actions (op_type) to exclude
 }
 
 // GetFeeds returns actions according to the provided options
@@ -843,6 +844,10 @@ func GetFeeds(opts GetFeedsOptions) ([]*Action, error) {
 
 	if !opts.IncludeDeleted {
 		cond = cond.And(builder.Eq{"is_deleted": false})
+	}
+
+	for _, opType := range opts.ExcludeTypes {
+		cond = cond.And(builder.Neq{"op_type": opType})
 	}
 
 	actions := make([]*Action, 0, 20)
