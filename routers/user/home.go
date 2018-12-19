@@ -143,6 +143,7 @@ func Dashboard(ctx *context.Context) {
 			models.ActionMirrorSyncDelete,
 		},
 	})
+
 	if ctx.Written() {
 		return
 	}

@@ -157,15 +157,16 @@ var (
 	}
 
 	// Security settings
-	InstallLock          bool
-	SecretKey            string
-	LogInRememberDays    int
-	CookieUserName       string
-	CookieRememberName   string
-	ReverseProxyAuthUser string
-	MinPasswordLength    int
-	ImportLocalPaths     bool
-	DisableGitHooks      bool
+	InstallLock           bool
+	SecretKey             string
+	LogInRememberDays     int
+	CookieUserName        string
+	CookieRememberName    string
+	ReverseProxyAuthUser  string
+	ReverseProxyAuthEmail string
+	MinPasswordLength     int
+	ImportLocalPaths      bool
+	DisableGitHooks       bool
 
 	// Database settings
 	UseSQLite3    bool
@@ -694,6 +695,27 @@ func createPIDFile(pidPath string) {
 	}
 }
 
+// CheckLFSVersion will check lfs version, if not satisfied, then disable it.
+func CheckLFSVersion() {
+	if LFS.StartServer {
+		//Disable LFS client hooks if installed for the current OS user
+		//Needs at least git v2.1.2
+
+		binVersion, err := git.BinVersion()
+		if err != nil {
+			log.Fatal(4, "Error retrieving git version: %v", err)
+		}
+
+		if !version.Compare(binVersion, "2.1.2", ">=") {
+			LFS.StartServer = false
+			log.Error(4, "LFS server support needs at least Git v2.1.2")
+		} else {
+			git.GlobalCommandArgs = append(git.GlobalCommandArgs, "-c", "filter.lfs.required=",
+				"-c", "filter.lfs.smudge=", "-c", "filter.lfs.clean=")
+		}
+	}
+}
+
 // NewContext initializes configuration context.
 // NOTE: do not print any log except error.
 func NewContext() {
@@ -889,7 +911,6 @@ func NewContext() {
 	LFS.HTTPAuthExpiry = sec.Key("LFS_HTTP_AUTH_EXPIRY").MustDuration(20 * time.Minute)
 
 	if LFS.StartServer {
-
 		if err := os.MkdirAll(LFS.ContentPath, 0700); err != nil {
 			log.Fatal(4, "Failed to create '%s': %v", LFS.ContentPath, err)
 		}
@@ -923,26 +944,6 @@ func NewContext() {
 				return
 			}
 		}
-
-		//Disable LFS client hooks if installed for the current OS user
-		//Needs at least git v2.1.2
-
-		binVersion, err := git.BinVersion()
-		if err != nil {
-			log.Fatal(4, "Error retrieving git version: %v", err)
-		}
-
-		if !version.Compare(binVersion, "2.1.2", ">=") {
-
-			LFS.StartServer = false
-			log.Error(4, "LFS server support needs at least Git v2.1.2")
-
-		} else {
-
-			git.GlobalCommandArgs = append(git.GlobalCommandArgs, "-c", "filter.lfs.required=",
-				"-c", "filter.lfs.smudge=", "-c", "filter.lfs.clean=")
-
-		}
 	}
 
 	sec = Cfg.Section("security")
@@ -952,6 +953,7 @@ func NewContext() {
 	CookieUserName = sec.Key("COOKIE_USERNAME").MustString("gitea_awesome")
 	CookieRememberName = sec.Key("COOKIE_REMEMBER_NAME").MustString("gitea_incredible")
 	ReverseProxyAuthUser = sec.Key("REVERSE_PROXY_AUTHENTICATION_USER").MustString("X-WEBAUTH-USER")
+	ReverseProxyAuthEmail = sec.Key("REVERSE_PROXY_AUTHENTICATION_EMAIL").MustString("X-WEBAUTH-EMAIL")
 	MinPasswordLength = sec.Key("MIN_PASSWORD_LENGTH").MustInt(6)
 	ImportLocalPaths = sec.Key("IMPORT_LOCAL_PATHS").MustBool(false)
 	DisableGitHooks = sec.Key("DISABLE_GIT_HOOKS").MustBool(false)
@@ -1218,6 +1220,7 @@ var Service struct {
 	EnableNotifyMail                        bool
 	EnableReverseProxyAuth                  bool
 	EnableReverseProxyAutoRegister          bool
+	EnableReverseProxyEmail                 bool
 	EnableCaptcha                           bool
 	CaptchaType                             string
 	RecaptchaSecret                         string
@@ -1249,6 +1252,7 @@ func newService() {
 	Service.RequireSignInView = sec.Key("REQUIRE_SIGNIN_VIEW").MustBool()
 	Service.EnableReverseProxyAuth = sec.Key("ENABLE_REVERSE_PROXY_AUTHENTICATION").MustBool()
 	Service.EnableReverseProxyAutoRegister = sec.Key("ENABLE_REVERSE_PROXY_AUTO_REGISTRATION").MustBool()
+	Service.EnableReverseProxyEmail = sec.Key("ENABLE_REVERSE_PROXY_EMAIL").MustBool()
 	Service.EnableCaptcha = sec.Key("ENABLE_CAPTCHA").MustBool(false)
 	Service.CaptchaType = sec.Key("CAPTCHA_TYPE").MustString(ImageCaptcha)
 	Service.RecaptchaSecret = sec.Key("RECAPTCHA_SECRET").MustString("")
