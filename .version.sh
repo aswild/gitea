@@ -6,7 +6,8 @@ codeversion=`sed -n 's/^var Version.*"\([^"]\+\).*/\1/p' main.go`
 gitversion=`git describe --tags --abbrev=0 | sed 's/v\([^-]\+\).*/\1/'`
 branch=`git symbolic-ref HEAD 2>/dev/null | sed -n 's:^refs/heads/::p'` || true
 
-if ( ! echo "$branch" | grep master >/dev/null 2>&1 ) && ( echo "$codeversion" | grep -q "$gitversion" ); then
+#if ( ! echo "$branch" | grep master >/dev/null 2>&1 ) && ( echo "$codeversion" | grep -q "$gitversion" ); then
+if true; then # override for 1.7 release branch
     # on a release branch use the usual format
     git describe --tags --always --dirty=+ | sed 's/-/+/; s/^v//'
 else
