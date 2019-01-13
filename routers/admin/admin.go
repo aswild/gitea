@@ -148,8 +148,8 @@ func Dashboard(ctx *context.Context) {
 			success = ctx.Tr("admin.dashboard.delete_missing_repos_success")
 			err = models.DeleteMissingRepositories(ctx.User)
 		case gitGCRepos:
-			success = ctx.Tr("admin.dashboard.git_gc_repos_success")
-			err = models.GitGcRepos()
+			success = ctx.Tr("admin.dashboard.git_gc_repos_started")
+			go models.GitGcRepos()
 		case syncSSHAuthorizedKey:
 			success = ctx.Tr("admin.dashboard.resync_all_sshkeys_success")
 			err = models.RewriteAllPublicKeys()

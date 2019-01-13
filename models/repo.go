@@ -2213,25 +2213,29 @@ func GitFsck() {
 }
 
 // GitGcRepos calls 'git gc' to remove unnecessary files and optimize the local repository
-func GitGcRepos() error {
+func GitGcRepos() {
 	args := append([]string{"gc"}, setting.Git.GCArgs...)
-	return x.
+	if err := x.
 		Where("id > 0").BufferSize(setting.IterateBufferSize).
 		Iterate(new(Repository),
 			func(idx int, bean interface{}) error {
 				repo := bean.(*Repository)
 				if err := repo.GetOwner(); err != nil {
-					return err
+					log.Error(4, "GitGcRepos: repo.GetOwner: %v", err)
 				}
+				log.Trace("Running git gc on repository %v", repo.FullName())
 				_, stderr, err := process.GetManager().ExecDir(
 					time.Duration(setting.Git.Timeout.GC)*time.Second,
 					RepoPath(repo.Owner.Name, repo.Name), "Repository garbage collection",
 					"git", args...)
 				if err != nil {
-					return fmt.Errorf("%v: %v", err, stderr)
+					log.Error(4, "GitGcRepos: %v: %v", err, stderr)
 				}
 				return nil
-			})
+			}); err != nil {
+		log.Error(4, "GitGcRepos: %v", err)
+	}
+	log.Info("Finished: GitGcRepos")
 }
 
 type repoChecker struct {
