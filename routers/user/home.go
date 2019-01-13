@@ -137,7 +137,7 @@ func Dashboard(ctx *context.Context) {
 		IncludePrivate:  true,
 		OnlyPerformedBy: false,
 		IncludeDeleted:  false,
-		ExcludeTypes:    []models.ActionType{
+		ExcludeTypes: []models.ActionType{
 			models.ActionMirrorSyncPush,
 			models.ActionMirrorSyncCreate,
 			models.ActionMirrorSyncDelete,
