@@ -846,9 +846,9 @@ func MirrorSyncDeleteAction(repo *Repository, refName string) error {
 type GetFeedsOptions struct {
 	RequestedUser    *User
 	RequestingUserID int64
-	IncludePrivate   bool // include private actions
-	OnlyPerformedBy  bool // only actions performed by requested user
-	IncludeDeleted   bool // include deleted actions
+	IncludePrivate   bool         // include private actions
+	OnlyPerformedBy  bool         // only actions performed by requested user
+	IncludeDeleted   bool         // include deleted actions
 	ExcludeTypes     []ActionType // actions (op_type) to exclude
 }
 

@@ -35,7 +35,7 @@ func TestGetUserHeatmapDataByUser(t *testing.T) {
 			IncludePrivate:   true,
 			OnlyPerformedBy:  false,
 			IncludeDeleted:   true,
-			ExcludeTypes:    []ActionType{
+			ExcludeTypes: []ActionType{
 				ActionMirrorSyncPush,
 				ActionMirrorSyncCreate,
 				ActionMirrorSyncDelete,
