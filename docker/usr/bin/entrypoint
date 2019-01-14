@@ -37,7 +37,7 @@ if [ -f /data/gitea/conf/app.ini ]; then
 fi
 
 if [ $# -gt 0 ]; then
-    exec "$@"
+    exec su-exec ${USER_UID}:${USER_GID} "$@"
 else
     exec /bin/s6-svscan /etc/s6
 fi
