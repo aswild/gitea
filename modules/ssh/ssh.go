@@ -168,8 +168,24 @@ func Listen(host string, port int, ciphers []string, keyExchanges []string, macs
 		},
 	}
 
-	keyPath := filepath.Join(setting.AppDataPath, "ssh/gogs.rsa")
-	if !com.IsExist(keyPath) {
+	// look for all supported ssh_host_*_key formats
+	keyFiles := make([]string, 0, 1)
+	for _, keyType := range [...]string{"rsa", "dsa", "ecdsa", "ed25519"} {
+		keyPath := filepath.Join(setting.AppDataPath, "ssh/ssh_host_"+keyType+"_key")
+		if com.IsExist(keyPath) {
+			keyFiles = append(keyFiles, keyPath)
+		}
+	}
+
+	// also check for legacy gogs.rsa, only if no openssh-named keys were found
+	oldKeyFile := filepath.Join(setting.AppDataPath, "ssh/gogs.rsa")
+	if len(keyFiles) == 0 && com.IsExist(oldKeyFile) {
+		keyFiles = append(keyFiles, oldKeyFile)
+	}
+
+	// if no keys found, create an RSA key
+	if len(keyFiles) == 0 {
+		keyPath := filepath.Join(setting.AppDataPath, "ssh/ssh_host_rsa_key")
 		filePath := filepath.Dir(keyPath)
 
 		if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
@@ -181,17 +197,21 @@ func Listen(host string, port int, ciphers []string, keyExchanges []string, macs
 			log.Fatal(4, "Failed to generate private key: %v - %s", err, stderr)
 		}
 		log.Trace("SSH: New private key is generateed: %s", keyPath)
+		keyFiles = append(keyFiles, keyPath)
 	}
 
-	privateBytes, err := ioutil.ReadFile(keyPath)
-	if err != nil {
-		log.Fatal(4, "SSH: Failed to load private key")
+	for _, keyPath := range keyFiles {
+		privateBytes, err := ioutil.ReadFile(keyPath)
+		if err != nil {
+			log.Fatal(4, "SSH: Failed to load private key %s: %v", keyPath, err)
+		}
+		private, err := ssh.ParsePrivateKey(privateBytes)
+		if err != nil {
+			log.Fatal(4, "SSH: Failed to parse private key %s: %v", keyPath, err)
+		}
+		config.AddHostKey(private)
+		log.Trace("SSH: loaded host key %s", keyPath)
 	}
-	private, err := ssh.ParsePrivateKey(privateBytes)
-	if err != nil {
-		log.Fatal(4, "SSH: Failed to parse private key")
-	}
-	config.AddHostKey(private)
 
 	go listen(config, host, port)
 }
