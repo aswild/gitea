@@ -5,6 +5,8 @@
 package ssh
 
 import (
+	"encoding/binary"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -21,12 +23,37 @@ import (
 	"code.gitea.io/gitea/modules/setting"
 )
 
-func cleanCommand(cmd string) string {
+// Parse a string out of an SSH payload.
+// SSH strings are encoded as a uint32 length (network byte order) followed by the data
+// See RFC 4251 section 5
+// Returns the string value and the rest of the payload
+func parseSshString(payload []byte) (string, []byte, error) {
+	if len(payload) < 4 {
+		return "", payload, fmt.Errorf("invalid SSH payload length (no size)")
+	}
+	length := binary.BigEndian.Uint32(payload[:4])
+	if uint32(len(payload)) < 4+length {
+		return "", payload, fmt.Errorf("invalid SSH payload length (missing data)")
+	}
+
+	s := string(payload[4 : 4+length])
+	rest := payload[4+length:]
+	return s, rest, nil
+}
+
+func cleanCommand(payload []byte) (string, error) {
+	// exec payload is a single string (RFC 4254 section 6.5)
+	cmd, _, err := parseSshString(payload)
+	if err != nil {
+		return cmd, err
+	}
+
 	i := strings.Index(cmd, "git")
 	if i == -1 {
-		return cmd
+		return cmd, fmt.Errorf("only git commands are supported")
 	}
-	return cmd[i:]
+	cmd = strings.TrimLeft(cmd[i:], "'()")
+	return cmd, nil
 }
 
 func handleServerConn(keyID string, chans <-chan ssh.NewChannel) {
@@ -45,23 +72,35 @@ func handleServerConn(keyID string, chans <-chan ssh.NewChannel) {
 		go func(in <-chan *ssh.Request) {
 			defer ch.Close()
 			for req := range in {
-				payload := cleanCommand(string(req.Payload))
 				switch req.Type {
 				case "env":
-					args := strings.Split(strings.Replace(payload, "\x00", "", -1), "\v")
-					if len(args) != 2 {
-						log.Warn("SSH: Invalid env arguments: '%#v'", args)
-						continue
-					}
-					args[0] = strings.TrimLeft(args[0], "\x04")
-					_, _, err := com.ExecCmdBytes("env", args[0]+"="+args[1])
+					// parse env requests for logging purposes, but reject them without doing anything
+					// since we don't use them at the moment.
+					// See RFC 4254 section 6.4
+					// The old code here parsed the SSH strings wrong, split key/value on "\v",
+					// then fork/exec'd an "env" command that would do nothing (and usually fail)
+					name, rest, err := parseSshString(req.Payload)
 					if err != nil {
-						log.Error(3, "env: %v", err)
+						log.Warn("SSH: Invalid env request: couldn't parse variable name: %v", err)
+					} else {
+						value, _, err := parseSshString(rest)
+						if err != nil {
+							log.Warn("SSH: Invalid env request: couldn't parse value for variable %q: %v", name, err)
+						} else {
+							log.Trace("SSH: Rejecting env request %s=%q", name, value)
+						}
+					}
+					req.Reply(false, nil)
+				case "exec":
+					cmdName, err := cleanCommand(req.Payload)
+					log.Trace("SSH: Payload: %q", cmdName)
+
+					if err != nil {
+						req.Reply(true, nil)
+						fmt.Fprintf(ch, "Gitea: invalid command: %q: %v\n", cmdName, err)
+						ch.SendRequest("exit-status", false, []byte{0, 0, 0, 1})
 						return
 					}
-				case "exec":
-					cmdName := strings.TrimLeft(payload, "'()")
-					log.Trace("SSH: Payload: %v", cmdName)
 
 					args := []string{"serv", "key-" + keyID, "--config=" + setting.CustomConf}
 					log.Trace("SSH: Arguments: %v", args)
@@ -106,7 +145,16 @@ func handleServerConn(keyID string, chans <-chan ssh.NewChannel) {
 
 					ch.SendRequest("exit-status", false, []byte{0, 0, 0, 0})
 					return
+				case "shell":
+					req.Reply(true, nil)
+					io.WriteString(ch, "Hi there, You've successfully authenticated, but Gitea does not provide shell access.\n")
+					io.WriteString(ch, "If this is unexpected, please log in with password and setup Gitea under another user.\n")
+					ch.SendRequest("exit-status", false, []byte{0, 0, 0, 0})
+					return
 				default:
+					// reject all other request types (e.g. pty-req)
+					log.Trace("SSH: Rejecting request type %v", req.Type)
+					req.Reply(false, nil)
 				}
 			}
 		}(reqs)
