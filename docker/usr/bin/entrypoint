@@ -23,7 +23,7 @@ for FOLDER in /data/gitea/conf /data/gitea/log /data/ssh; do
 done
 
 if [ $# -gt 0 ]; then
-    exec "$@"
+    exec su-exec ${USER_UID}:${USER_GID} "$@"
 else
     exec /bin/s6-svscan /etc/s6
 fi
