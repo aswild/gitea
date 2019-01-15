@@ -1,5 +1,8 @@
 #!/bin/sh
 
+my_uid=`id -u`
+my_gid=`id -g`
+
 if [ "${USER}" != "git" ]; then
     # rename user
     sed -i -e "s/^git\:/${USER}\:/g" /etc/passwd
@@ -17,27 +20,48 @@ fi
 
 ## Change GID for USER?
 if [ -n "${USER_GID}" ] && [ "${USER_GID}" != "`id -g ${USER}`" ]; then
+    echo "Entrypoint: changing GID for $USER from `id -g ${USER}` to $USER_GID"
     sed -i -e "s/^${USER}:\([^:]*\):[0-9]*/${USER}:\1:${USER_GID}/" /etc/group
     sed -i -e "s/^${USER}:\([^:]*\):\([0-9]*\):[0-9]*/${USER}:\1:\2:${USER_GID}/" /etc/passwd
 fi
 
 ## Change UID for USER?
 if [ -n "${USER_UID}" ] && [ "${USER_UID}" != "`id -u ${USER}`" ]; then
+    echo "Entrypoint: changing UID for $USER from `id -u ${USER}` to $USER_UID"
     sed -i -e "s/^${USER}:\([^:]*\):[0-9]*:\([0-9]*\)/${USER}:\1:${USER_UID}:\2/" /etc/passwd
+fi
+
+if [ -z "${USER_UID}" ]; then
+    USER_UID=$my_uid
+fi
+if [ -z "${USER_GID}" ]; then
+    USER_GID=$my_gid
 fi
 
 for FOLDER in /data/gitea/conf /data/gitea/log /data/ssh; do
     mkdir -p ${FOLDER}
 done
 
+echo "Entrypoint: checking data file ownership"
+find /data/gitea \( -type f -o -type d \) -not \( -user ${USER_UID} -group ${USER_GID} \) -print0 |
+    xargs -0 -r chown -v ${USER_UID}:${USER_GID}
+
 if [ -f /data/gitea/conf/app.ini ]; then
-    echo "Found app.ini config file, migrating database"
+    echo "Entrypoint: Found app.ini config file, migrating database"
     chown -R ${USER_UID}:${USER_GID} /data/git /data/gitea
     su - ${USER} -c gitea migrate -c /data/gitea/conf/app.ini
 fi
 
 if [ $# -gt 0 ]; then
-    exec su-exec ${USER_UID}:${USER_GID} "$@"
+    if [ $USER_UID != $my_uid ] || [ $USER_GID != $my_gid ]; then
+        echo "Entrypoint: running command '$*' as user $USER"
+        exec su-exec ${USER_UID}:${USER_GID} "$@"
+    else
+        # skip su-exec if we don't need to change users
+        echo "Entrypoint: Running command '$*' as current user $USER"
+        exec "$@"
+    fi
 else
+    echo "Entrypoint: Starting S6"
     exec /bin/s6-svscan /etc/s6
 fi
