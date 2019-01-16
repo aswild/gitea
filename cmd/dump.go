@@ -48,6 +48,10 @@ It can be used for backup and capture Gitea server image to send to maintainer`,
 			Name:  "database, d",
 			Usage: "Specify the database SQL syntax",
 		},
+		cli.BoolFlag{
+			Name:  "dbonly, D",
+			Usage: "db dump only, no zipfile",
+		},
 	},
 }
 
@@ -62,6 +66,20 @@ func runDump(ctx *cli.Context) error {
 	err := models.SetEngine()
 	if err != nil {
 		return err
+	}
+
+	if ctx.Bool("dbonly") {
+		targetDBType := ctx.String("database")
+		if len(targetDBType) > 0 && targetDBType != models.DbCfg.Type {
+			log.Printf("Dumping database %s => %s...", models.DbCfg.Type, targetDBType)
+		} else {
+			log.Printf("Dumping database...")
+		}
+
+		if err := models.DumpDatabase("gitea-db.sql", targetDBType); err != nil {
+			log.Fatalf("Failed to dump database: %v", err)
+		}
+		return nil
 	}
 
 	tmpDir := ctx.String("tempdir")
