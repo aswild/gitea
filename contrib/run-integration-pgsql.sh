@@ -28,6 +28,11 @@ trap stop_container EXIT
 container_ip="$(docker container inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $container_id)"
 [[ -n $container_ip ]] || die "failed to get postgres container ip"
 
+echo "Waiting for postgres to be ready"
+while ! nc -z $container_ip 5432; do
+    sleep 1
+done
+
 test_opts=(
     TEST_PGSQL_HOST="$container_ip"
     TEST_PGSQL_DBNAME="$POSTGRES_DB"
