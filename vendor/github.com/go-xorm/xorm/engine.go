@@ -563,8 +563,11 @@ func (engine *Engine) dumpTables(tables []*core.Table, w io.Writer, tp ...core.D
 		}
 
 		// FIXME: Hack for postgres
-		if string(dialect.DBType()) == core.POSTGRES && table.AutoIncrColumn() != nil {
-			_, err = io.WriteString(w, "SELECT setval('table_id_seq', COALESCE((SELECT MAX("+table.AutoIncrColumn().Name+") FROM "+dialect.Quote(table.Name)+"), 1), false);\n")
+		// WILD HACK - fix for sqlite3 -> postgres
+		if strings.ToLower(distDBName) == core.POSTGRES && table.AutoIncrColumn() != nil {
+			//_, err = io.WriteString(w, "SELECT setval('table_id_seq', COALESCE((SELECT MAX("+table.AutoIncrColumn().Name+") FROM "+dialect.Quote(table.Name)+"), 1), false);\n")
+			_, err = io.WriteString(w, fmt.Sprintf("SELECT setval('%s_id_seq', COALESCE((SELECT MAX(%s) FROM %s), 1), true);\n",
+									table.Name, table.AutoIncrColumn().Name, dialect.Quote(table.Name)))
 			if err != nil {
 				return err
 			}
