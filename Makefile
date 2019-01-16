@@ -55,7 +55,7 @@ else
 	else
 		VERSION ?= master
 	endif
-	GITEA_VERSION := $(shell ./.version.sh)
+	GITEA_VERSION := $(shell git describe --tags --dirty=+ | sed 's/^v//')
 endif
 
 LDFLAGS := -X "main.Version=$(GITEA_VERSION)" -X "main.Tags=$(TAGS)"
