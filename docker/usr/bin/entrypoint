@@ -38,9 +38,7 @@ if [ -z "${USER_GID}" ]; then
     USER_GID=$my_gid
 fi
 
-for FOLDER in /data/gitea/conf /data/gitea/log /data/ssh; do
-    mkdir -p ${FOLDER}
-done
+mkdir -p /data/gitea/conf /data/gitea/log
 
 echo "Entrypoint: checking data file ownership"
 find /data/gitea \( -type f -o -type d \) -not \( -user ${USER_UID} -group ${USER_GID} \) -print0 |
@@ -52,7 +50,7 @@ if [ -f /data/gitea/conf/app.ini ]; then
     su - ${USER} -c gitea migrate -c /data/gitea/conf/app.ini
 fi
 
-if [ $# -gt 0 ]; then
+if [ $# -gt 0 ] && [ -z "`echo $1 | grep s6-svscan`" ]; then
     if [ $USER_UID != $my_uid ] || [ $USER_GID != $my_gid ]; then
         echo "Entrypoint: running command '$*' as user $USER"
         exec su-exec ${USER_UID}:${USER_GID} "$@"
