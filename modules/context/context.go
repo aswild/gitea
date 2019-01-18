@@ -98,7 +98,7 @@ func (ctx *Context) RedirectToFirst(location ...string) {
 
 // HTML calls Context.HTML and converts template name to string.
 func (ctx *Context) HTML(status int, name base.TplName) {
-	log.Debug("Template: %s", name)
+	//log.Debug("Template: %s", name)
 	ctx.Context.HTML(status, string(name))
 }
 
@@ -258,8 +258,8 @@ func Contexter() macaron.Handler {
 
 		ctx.Data["CsrfToken"] = html.EscapeString(x.GetToken())
 		ctx.Data["CsrfTokenHtml"] = template.HTML(`<input type="hidden" name="_csrf" value="` + ctx.Data["CsrfToken"].(string) + `">`)
-		log.Debug("Session ID: %s", sess.ID())
-		log.Debug("CSRF Token: %v", ctx.Data["CsrfToken"])
+		//log.Debug("Session ID: %s", sess.ID())
+		//log.Debug("CSRF Token: %v", ctx.Data["CsrfToken"])
 
 		ctx.Data["IsLandingPageHome"] = setting.LandingPageURL == setting.LandingPageHome
 		ctx.Data["IsLandingPageExplore"] = setting.LandingPageURL == setting.LandingPageExplore
