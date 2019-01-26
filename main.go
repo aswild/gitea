@@ -8,6 +8,7 @@ package main // import "code.gitea.io/gitea"
 
 import (
 	"os"
+	"runtime"
 	"strings"
 
 	"code.gitea.io/gitea/cmd"
@@ -58,8 +59,8 @@ func main() {
 
 func formatBuiltWith(Tags string) string {
 	if len(Tags) == 0 {
-		return ""
+		return " built with " + runtime.Version()
 	}
 
-	return " built with: " + strings.Replace(Tags, " ", ", ", -1)
+	return " built with " + runtime.Version() + " : " + strings.Replace(Tags, " ", ", ", -1)
 }
