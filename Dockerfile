@@ -48,7 +48,7 @@ ENV GITEA_CUSTOM /data/gitea
 
 VOLUME ["/data/gitea"]
 
-ENTRYPOINT ["/usr/bin/entrypoint"]
+ENTRYPOINT ["/entrypoint"]
 CMD ["/bin/s6-svscan", "/etc/s6"]
 
 COPY docker /
