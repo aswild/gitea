@@ -1,7 +1,7 @@
 
 ###################################
 #Build stage
-FROM golang:1.11-alpine3.8 AS build-env
+FROM golang:1.11-alpine3.9 AS build-env
 
 #Build deps
 RUN apk --no-cache add build-base git
@@ -19,8 +19,7 @@ WORKDIR ${GOPATH}/src/code.gitea.io/gitea
 RUN if [ -n "${GITEA_VERSION}" ]; then git checkout "${GITEA_VERSION}"; fi \
  && make GITEA_VERSION="${VERSION}" clean generate build
 
-# main container
-FROM alpine:3.8
+FROM alpine:3.9
 LABEL maintainer="maintainers@gitea.io"
 
 RUN set -s && \
