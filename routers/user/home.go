@@ -391,6 +391,12 @@ func showOrgProfile(ctx *context.Context) {
 	}
 
 	org := ctx.Org.Organization
+
+	if !models.HasOrgVisible(org, ctx.User) {
+		ctx.NotFound("HasOrgVisible", nil)
+		return
+	}
+
 	ctx.Data["Title"] = org.DisplayName()
 
 	var orderBy models.SearchOrderBy
