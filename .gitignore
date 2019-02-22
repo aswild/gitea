@@ -64,6 +64,7 @@ coverage.all
 /integrations/mssql.ini
 /routers/repo/authorized_keys
 /node_modules
+/modules/indexer/issues/indexers
 
 
 # Snapcraft
