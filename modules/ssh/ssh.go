@@ -207,6 +207,11 @@ func Listen(host string, port int, ciphers []string, keyExchanges []string, macs
 			MACs:         macs,
 		},
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			user := conn.User()
+			if user != setting.SSH.BuiltinServerUser {
+				return nil, fmt.Errorf("username %q doesn't match configured built-in SSH username %q",
+					user, setting.SSH.BuiltinServerUser)
+			}
 			pkey, err := models.SearchPublicKeyByContent(strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key))))
 			if err != nil {
 				log.Error(3, "SearchPublicKeyByContent: %v", err)
