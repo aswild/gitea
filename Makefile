@@ -447,4 +447,8 @@ generate-images: $(TMPDIR)
 					$(PWD)/public/img/favicon.ico
 	rm -rf $(TMPDIR)/images
 
+.PHONY: pr
+pr:
+	$(GO) run contrib/pr/checkout.go $(PR)
+
 endif # PWD == GOPATH_GITEADIR
