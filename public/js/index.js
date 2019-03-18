@@ -2292,10 +2292,12 @@ function initVueComponents(){
         mounted: function() {
             this.searchRepos(this.reposFilter);
 
-            var self = this;
-            Vue.nextTick(function() {
-                self.$refs.search.focus();
-            });
+            // Disable auto-focusing the search box, it's almost never what I want
+            // to happen when the page loads
+            //var self = this;
+            //Vue.nextTick(function() {
+            //    self.$refs.search.focus();
+            //});
         },
 
         methods: {
