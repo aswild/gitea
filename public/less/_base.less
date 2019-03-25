@@ -43,7 +43,7 @@
     font-weight: 700;
 }
 
-@default-fonts: -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', Roboto, Helvetica, Arial;
+@default-fonts: 'Segoe UI', Lato, -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', Roboto, Helvetica, Arial;
 @monospaced-fonts: 'SF Mono', Consolas, Menlo, 'Liberation Mono', Monaco, 'Lucida Console';
 
 .override-fonts(@fonts) {
@@ -57,11 +57,11 @@
 
     /* We're going to just override the semantic fonts here */
     h1, h2, h3, h4, h5 {
-        font-family: Lato, @fonts, sans-serif;
+        font-family: @fonts, sans-serif;
     }
 
     .home .hero h1, .home .hero h2 {
-        font-family: 'PT Sans Narrow', Lato, @fonts, sans-serif;
+        font-family: 'PT Sans Narrow', @fonts, sans-serif;
     }
 
     .ui.accordion .title:not(.ui),
@@ -89,7 +89,7 @@
     .ui.text.container,
     .ui.language > .menu > .item&
     {
-        font-family: Lato, @fonts, sans-serif;
+        font-family: @fonts, sans-serif;
     }
 }
 
