@@ -2270,7 +2270,7 @@ func GitGcRepos() {
 			func(idx int, bean interface{}) error {
 				repo := bean.(*Repository)
 				if err := repo.GetOwner(); err != nil {
-					log.Error(4, "GitGcRepos: repo.GetOwner: %v", err)
+					log.Error("GitGcRepos: repo.GetOwner: %v", err)
 				}
 				log.Trace("Running git gc on repository %v", repo.FullName())
 				_, stderr, err := process.GetManager().ExecDir(
@@ -2278,11 +2278,11 @@ func GitGcRepos() {
 					RepoPath(repo.Owner.Name, repo.Name), "Repository garbage collection",
 					"git", args...)
 				if err != nil {
-					log.Error(4, "GitGcRepos: %v: %v", err, stderr)
+					log.Error("GitGcRepos: %v: %v", err, stderr)
 				}
 				return nil
 			}); err != nil {
-		log.Error(4, "GitGcRepos: %v", err)
+		log.Error("GitGcRepos: %v", err)
 	}
 	log.Info("Finished: GitGcRepos")
 }
