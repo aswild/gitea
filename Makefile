@@ -1,3 +1,5 @@
+.NOTPARALLEL:
+
 DIST := dist
 IMPORT := code.gitea.io/gitea
 export GO111MODULE=off
@@ -5,7 +7,7 @@ export GO111MODULE=off
 GO ?= go
 SED_INPLACE := sed -i
 
-export PATH := $($(GO) env GOPATH)/bin:$(PATH)
+export PATH := $(shell $(GO) env GOPATH)/bin:$(PATH)
 
 ifeq ($(OS), Windows_NT)
 	EXECUTABLE := gitea.exe
@@ -85,7 +87,7 @@ include docker/Makefile
 
 .PHONY: clean
 clean:
-	$(GO) clean -i ./...
+	GO111MODULE=on $(GO) clean -mod=vendor -i ./...
 	rm -rf $(EXECUTABLE) $(DIST) $(BINDATA) \
 		integrations*.test \
 		integrations/gitea-integration-pgsql/ integrations/gitea-integration-mysql/ integrations/gitea-integration-mysql8/ integrations/gitea-integration-sqlite/ \
@@ -98,14 +100,14 @@ fmt:
 
 .PHONY: vet
 vet:
-	$(GO) vet $(PACKAGES)
+	GO111MODULE=on $(GO) vet -mod=vendor $(PACKAGES)
 
 .PHONY: generate
 generate:
 	@hash go-bindata > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u github.com/jteeuwen/go-bindata/go-bindata; \
 	fi
-	$(GO) generate $(PACKAGES)
+	GO111MODULE=on $(GO) generate -mod=vendor $(PACKAGES)
 
 .PHONY: generate-swagger
 generate-swagger:
