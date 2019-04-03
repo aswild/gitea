@@ -1,37 +1,5 @@
 
 @font-face {
-    font-family: 'Lato';
-    src: url('../vendor/assets/lato-fonts/lato-regular.eot');
-    src: url('../vendor/assets/lato-fonts/lato-regular.eot?#iefix') format('embedded-opentype'), url('../vendor/assets/lato-fonts/lato-regular.woff2') format('woff2'), url('../vendor/assets/lato-fonts/lato-regular.woff') format('woff'), url('../vendor/assets/lato-fonts/lato-regular.ttf') format('truetype');
-    font-weight: 400;
-    font-style: normal;
-}
-
-@font-face {
-    font-family: 'Lato';
-    src: url('../vendor/assets/lato-fonts/lato-italic.eot');
-    src: url('../vendor/assets/lato-fonts/lato-italic.eot?#iefix') format('embedded-opentype'), url('../vendor/assets/lato-fonts/lato-italic.woff2') format('woff2'), url('../vendor/assets/lato-fonts/lato-italic.woff') format('woff'), url('../vendor/assets/lato-fonts/lato-italic.ttf') format('truetype');
-    font-weight: 400;
-    font-style: italic;
-}
-
-@font-face {
-    font-family: 'Lato';
-    src: url('../vendor/assets/lato-fonts/lato-bold.eot');
-    src: url('../vendor/assets/lato-fonts/lato-bold.eot?#iefix') format('embedded-opentype'), url('../vendor/assets/lato-fonts/lato-bold.woff2') format('woff2'), url('../vendor/assets/lato-fonts/lato-bold.woff') format('woff'), url('../vendor/assets/lato-fonts/lato-bold.ttf') format('truetype');
-    font-weight: 700;
-    font-style: normal;
-}
-
-@font-face {
-    font-family: 'Lato';
-    src: url('../vendor/assets/lato-fonts/lato-bolditalic.eot');
-    src: url('../vendor/assets/lato-fonts/lato-bolditalic.eot?#iefix') format('embedded-opentype'), url('../vendor/assets/lato-fonts/lato-bolditalic.woff2') format('woff2'), url('../vendor/assets/lato-fonts/lato-bolditalic.woff') format('woff'), url('../vendor/assets/lato-fonts/lato-bolditalic.ttf') format('truetype');
-    font-weight: 700;
-    font-style: italic;
-}
-
-@font-face {
     font-family: 'Yu Gothic';
     src: local('Yu Gothic Medium');
     font-weight: 400;
@@ -43,8 +11,8 @@
     font-weight: 700;
 }
 
-@default-fonts: 'Segoe UI', Lato, -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', Roboto, Helvetica, Arial;
-@monospaced-fonts: 'SF Mono', Consolas, Menlo, 'Liberation Mono', Monaco, 'Lucida Console';
+@default-fonts: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Noto Sans', system-ui, Roboto, Helvetica, Arial;
+@monospaced-fonts: monospace;
 
 .override-fonts(@fonts) {
     textarea {
