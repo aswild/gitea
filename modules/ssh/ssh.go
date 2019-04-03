@@ -70,7 +70,7 @@ func handleServerConn(keyID string, chans <-chan ssh.NewChannel) {
 
 		ch, reqs, err := newChan.Accept()
 		if err != nil {
-			log.Error(3, "Error accepting channel: %v", err)
+			log.Error("Error accepting channel: %v", err)
 			continue
 		}
 
@@ -118,23 +118,23 @@ func handleServerConn(keyID string, chans <-chan ssh.NewChannel) {
 
 					stdout, err := cmd.StdoutPipe()
 					if err != nil {
-						log.Error(3, "SSH: StdoutPipe: %v", err)
+						log.Error("SSH: StdoutPipe: %v", err)
 						return
 					}
 					stderr, err := cmd.StderrPipe()
 					if err != nil {
-						log.Error(3, "SSH: StderrPipe: %v", err)
+						log.Error("SSH: StderrPipe: %v", err)
 						return
 					}
 					input, err := cmd.StdinPipe()
 					if err != nil {
-						log.Error(3, "SSH: StdinPipe: %v", err)
+						log.Error("SSH: StdinPipe: %v", err)
 						return
 					}
 
 					// FIXME: check timeout
 					if err = cmd.Start(); err != nil {
-						log.Error(3, "SSH: Start: %v", err)
+						log.Error("SSH: Start: %v", err)
 						return
 					}
 
@@ -144,7 +144,7 @@ func handleServerConn(keyID string, chans <-chan ssh.NewChannel) {
 					io.Copy(ch.Stderr(), stderr)
 
 					if err = cmd.Wait(); err != nil {
-						log.Error(3, "SSH: Wait: %v", err)
+						log.Error("SSH: Wait: %v", err)
 						return
 					}
 
@@ -169,13 +169,13 @@ func handleServerConn(keyID string, chans <-chan ssh.NewChannel) {
 func listen(config *ssh.ServerConfig, host string, port int) {
 	listener, err := net.Listen("tcp", host+":"+com.ToStr(port))
 	if err != nil {
-		log.Fatal(4, "Failed to start SSH server: %v", err)
+		log.Fatal("Failed to start SSH server: %v", err)
 	}
 	for {
 		// Once a ServerConfig has been configured, connections can be accepted.
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Error(3, "SSH: Error accepting incoming connection: %v", err)
+			log.Error("SSH: Error accepting incoming connection: %v", err)
 			continue
 		}
 
@@ -190,7 +190,7 @@ func listen(config *ssh.ServerConfig, host string, port int) {
 				if err == io.EOF {
 					log.Warn("SSH: Handshaking with %s was terminated: %v", conn.RemoteAddr(), err)
 				} else {
-					log.Error(3, "SSH: Error on handshaking with %s: %v", conn.RemoteAddr(), err)
+					log.Error("SSH: Error on handshaking with %s: %v", conn.RemoteAddr(), err)
 				}
 				return
 			}
@@ -219,7 +219,7 @@ func Listen(host string, port int, ciphers []string, keyExchanges []string, macs
 			}
 			pkey, err := models.SearchPublicKeyByContent(strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key))))
 			if err != nil {
-				log.Error(3, "SearchPublicKeyByContent: %v", err)
+				log.Error("SearchPublicKeyByContent: %v", err)
 				return nil, err
 			}
 			return &ssh.Permissions{Extensions: map[string]string{"key-id": com.ToStr(pkey.ID)}}, nil
@@ -247,12 +247,12 @@ func Listen(host string, port int, ciphers []string, keyExchanges []string, macs
 		filePath := filepath.Dir(keyPath)
 
 		if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
-			log.Error(4, "Failed to create dir %s: %v", filePath, err)
+			log.Error("Failed to create dir %s: %v", filePath, err)
 		}
 
 		err := GenKeyPair(keyPath)
 		if err != nil {
-			log.Fatal(4, "Failed to generate private key: %v", err)
+			log.Fatal("Failed to generate private key: %v", err)
 		}
 		log.Trace("SSH: New private key is generateed: %s", keyPath)
 		keyFiles = append(keyFiles, keyPath)
@@ -261,11 +261,11 @@ func Listen(host string, port int, ciphers []string, keyExchanges []string, macs
 	for _, keyPath := range keyFiles {
 		privateBytes, err := ioutil.ReadFile(keyPath)
 		if err != nil {
-			log.Fatal(4, "SSH: Failed to load private key %s: %v", keyPath, err)
+			log.Fatal("SSH: Failed to load private key %s: %v", keyPath, err)
 		}
 		private, err := ssh.ParsePrivateKey(privateBytes)
 		if err != nil {
-			log.Fatal(4, "SSH: Failed to parse private key %s: %v", keyPath, err)
+			log.Fatal("SSH: Failed to parse private key %s: %v", keyPath, err)
 		}
 		config.AddHostKey(private)
 		log.Trace("SSH: loaded host key %s", keyPath)
