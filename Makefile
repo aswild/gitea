@@ -28,8 +28,6 @@ EXTRA_GOFLAGS ?=
 
 TAGS ?=
 
-MAKE_VERSION := $(shell make -v | head -n 1)
-
 ifneq ($(DRONE_TAG),)
 	VERSION ?= $(subst v,,$(DRONE_TAG))
 	GITEA_VERSION ?= $(VERSION)
@@ -42,7 +40,7 @@ else
 	GITEA_VERSION ?= $(shell git describe --tags --dirty=+ | sed 's/^v//')
 endif
 
-LDFLAGS := -X "main.MakeVersion=$(MAKE_VERSION)" -X "main.Version=$(GITEA_VERSION)" -X "main.Tags=$(TAGS)"
+LDFLAGS := -X "main.Version=$(GITEA_VERSION)" -X "main.Tags=$(TAGS)"
 
 PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations/migration-test,$(filter-out code.gitea.io/gitea/integrations,$(shell $(GO) list ./... | grep -v /vendor/)))
 SOURCES ?= $(shell find . -name "*.go" -type f)
