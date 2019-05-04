@@ -11,9 +11,9 @@ SHASUM ?= shasum -a 256
 export PATH := $(shell $(GO) env GOPATH)/bin:$(PATH)
 
 ifeq ($(OS), Windows_NT)
-	EXECUTABLE := gitea.exe
+	EXECUTABLE ?= gitea.exe
 else
-	EXECUTABLE := gitea
+	EXECUTABLE ?= gitea
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Darwin)
 		SED_INPLACE := sed -i ''
@@ -41,7 +41,7 @@ else
 	GITEA_VERSION ?= $(shell git describe --tags --dirty=+ | sed 's/^v//')
 endif
 
-LDFLAGS := -X "main.Version=$(GITEA_VERSION)" -X "main.Tags=$(TAGS)"
+LDFLAGS := $(LDFLAGS) -X "main.Version=$(GITEA_VERSION)" -X "main.Tags=$(TAGS)"
 
 PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations/migration-test,$(filter-out code.gitea.io/gitea/integrations,$(shell $(GO) list ./... | grep -v /vendor/)))
 SOURCES ?= $(shell find . -name "*.go" -type f)
@@ -69,12 +69,6 @@ TEST_MSSQL_HOST ?= mssql:1433
 TEST_MSSQL_DBNAME ?= gitea
 TEST_MSSQL_USERNAME ?= sa
 TEST_MSSQL_PASSWORD ?= MwantsaSecurePassword1
-
-ifeq ($(OS), Windows_NT)
-	EXECUTABLE := gitea.exe
-else
-	EXECUTABLE := gitea
-endif
 
 # $(call strip-suffix,filename)
 strip-suffix = $(firstword $(subst ., ,$(1)))
