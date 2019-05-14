@@ -176,6 +176,7 @@ var (
 		ThemeColorMetaTag   string
 		MaxDisplayFileSize  int64
 		ShowUserEmail       bool
+		DefaultShowFullName bool
 		DefaultTheme        string
 		Themes              []string
 
@@ -478,7 +479,10 @@ func CheckLFSVersion() {
 // SetCustomPathAndConf will set CustomPath and CustomConf with reference to the
 // GITEA_CUSTOM environment variable and with provided overrides before stepping
 // back to the default
-func SetCustomPathAndConf(providedCustom, providedConf string) {
+func SetCustomPathAndConf(providedCustom, providedConf, providedWorkPath string) {
+	if len(providedWorkPath) != 0 {
+		AppWorkPath = filepath.ToSlash(providedWorkPath)
+	}
 	if giteaCustom, ok := os.LookupEnv("GITEA_CUSTOM"); ok {
 		CustomPath = giteaCustom
 	}
@@ -918,6 +922,7 @@ func NewContext() {
 	ShowFooterTemplateLoadTime = Cfg.Section("other").Key("SHOW_FOOTER_TEMPLATE_LOAD_TIME").MustBool(true)
 
 	UI.ShowUserEmail = Cfg.Section("ui").Key("SHOW_USER_EMAIL").MustBool(true)
+	UI.DefaultShowFullName = Cfg.Section("ui").Key("DEFAULT_SHOW_FULL_NAME").MustBool(false)
 
 	HasRobotsTxt = com.IsFile(path.Join(CustomPath, "robots.txt"))
 
@@ -1004,6 +1009,7 @@ func NewServices() {
 	NewLogServices(false)
 	newCacheService()
 	newSessionService()
+	newCORSService()
 	newMailService()
 	newRegisterMailService()
 	newNotifyMailService()

@@ -68,7 +68,7 @@ coverage.all
 /routers/repo/authorized_keys
 /node_modules
 /modules/indexer/issues/indexers
-
+routers/repo/authorized_keys
 
 # Snapcraft
 snap/.snapcraft/

@@ -50,7 +50,7 @@ VOLUME ["/data/gitea"]
 ENTRYPOINT ["/usr/bin/entrypoint"]
 CMD ["/bin/s6-svscan", "/etc/s6"]
 
-COPY docker /
+COPY docker/root /
 COPY --from=build-env /go/src/code.gitea.io/gitea/gitea /app/gitea/gitea
 RUN set -x && \
     rm -f /Makefile && \

@@ -78,24 +78,6 @@ func handleServerConn(keyID string, chans <-chan ssh.NewChannel) {
 			defer ch.Close()
 			for req := range in {
 				switch req.Type {
-				case "env":
-					// parse env requests for logging purposes, but reject them without doing anything
-					// since we don't use them at the moment.
-					// See RFC 4254 section 6.4
-					// The old code here parsed the SSH strings wrong, split key/value on "\v",
-					// then fork/exec'd an "env" command that would do nothing (and usually fail)
-					name, rest, err := parseSshString(req.Payload)
-					if err != nil {
-						log.Warn("SSH: Invalid env request: couldn't parse variable name: %v", err)
-					} else {
-						value, _, err := parseSshString(rest)
-						if err != nil {
-							log.Warn("SSH: Invalid env request: couldn't parse value for variable %q: %v", name, err)
-						} else {
-							log.Trace("SSH: Rejecting env request %s=%q", name, value)
-						}
-					}
-					req.Reply(false, nil)
 				case "exec":
 					cmdName, err := cleanCommand(req.Payload)
 					log.Trace("SSH: Payload: %q", cmdName)
