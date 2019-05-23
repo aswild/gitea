@@ -334,7 +334,7 @@ NB: You must `REDIRECT_MACARON_LOG` and have `DISABLE_ROUTER_LOG` set to `false`
 
 ### Console log mode (`log.console`, `log.console.*`, or `MODE=console`)
 
-- For the console logger `COLORIZE` will default to `true` if not on windows.
+- For the console logger `COLORIZE` will default to `true` if not on windows or the terminal is determined to be able to color.
 - `STDERR`: **false**: Use Stderr instead of Stdout.
 
 ### File log mode (`log.file`, `log.file.*` or `MODE=file`)
@@ -344,7 +344,6 @@ NB: You must `REDIRECT_MACARON_LOG` and have `DISABLE_ROUTER_LOG` set to `false`
 - `MAX_SIZE_SHIFT`: **28**: Maximum size shift of a single file, 28 represents 256Mb.
 - `DAILY_ROTATE`: **true**: Rotate logs daily.
 - `MAX_DAYS`: **7**: Delete the log file after n days
-- NB: `COLORIZE`: will default to `true` if not on windows.
 - `COMPRESS`: **true**: Compress old log files by default with gzip
 - `COMPRESSION_LEVEL`: **-1**: Compression level
 
@@ -421,7 +420,7 @@ NB: You must `REDIRECT_MACARON_LOG` and have `DISABLE_ROUTER_LOG` set to `false`
 
 ## OAuth2 (`oauth2`)
 
-- `ENABLED`: **true**: Enables OAuth2 provider.
+- `ENABLE`: **true**: Enables OAuth2 provider.
 - `ACCESS_TOKEN_EXPIRATION_TIME`: **3600**: Lifetime of an OAuth2 access token in seconds
 - `REFRESH_TOKEN_EXPIRATION_TIME`: **730**: Lifetime of an OAuth2 access token in hours
 - `INVALIDATE_REFRESH_TOKEN`: **false**: Check if refresh token got already used
