@@ -40,7 +40,7 @@ var (
 
 func init() {
 	setting.AppVer = Version
-	setting.AppBuiltWith = formatBuiltWith(Tags)
+	setting.AppBuiltWith = formatBuiltWith()
 
 	// Grab the original help templates
 	originalAppHelpTemplate = cli.AppHelpTemplate
@@ -52,7 +52,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "Gitea"
 	app.Usage = "A painless self-hosted Git service"
-	app.Version = Version + formatBuiltWith(Tags)
+	app.Version = Version + formatBuiltWith()
 	app.Commands = []cli.Command{
 		cmd.CmdWeb,
 		cmd.CmdServ,
@@ -63,6 +63,7 @@ func main() {
 		cmd.CmdGenerate,
 		cmd.CmdMigrate,
 		cmd.CmdKeys,
+		cmd.CmdConvert,
 	}
 	// Now adjust these commands to add our global configuration options
 
@@ -173,10 +174,11 @@ DEFAULT CONFIGURATION:
 `, originalTemplate, setting.CustomPath, overrided, setting.CustomConf, setting.AppPath, setting.AppWorkPath)
 }
 
-func formatBuiltWith(makeTags string) string {
+func formatBuiltWith() string {
+	var version = runtime.Version()
 	if len(Tags) == 0 {
-		return " built with " + runtime.Version()
+		return " built with " + version
 	}
 
-	return " built with " + runtime.Version() + " : " + strings.Replace(Tags, " ", ", ", -1)
+	return " built with " + version + " : " + strings.Replace(Tags, " ", ", ", -1)
 }
