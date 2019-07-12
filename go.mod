@@ -40,15 +40,15 @@ require (
 	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
 	github.com/facebookgo/stats v0.0.0-20151006221625-1b76add642e4 // indirect
 	github.com/facebookgo/subset v0.0.0-20150612182917-8dac2c3c4870 // indirect
-	github.com/gliderlabs/ssh v0.1.4 // indirect
+	github.com/gliderlabs/ssh v0.2.2
 	github.com/glycerine/go-unsnap-stream v0.0.0-20180323001048-9f0cb55181dd // indirect
 	github.com/glycerine/goconvey v0.0.0-20190315024820-982ee783a72e // indirect
 	github.com/go-macaron/binding v0.0.0-20160711225916-9440f336b443
 	github.com/go-macaron/cache v0.0.0-20151013081102-561735312776
-	github.com/go-macaron/captcha v0.0.0-20151123225153-8aa5919789ab
+	github.com/go-macaron/captcha v0.0.0-20190710000913-8dc5911259df
 	github.com/go-macaron/cors v0.0.0-20190309005821-6fd6a9bfe14e9
-	github.com/go-macaron/csrf v0.0.0-20180426211211-503617c6b372
-	github.com/go-macaron/i18n v0.0.0-20160612092837-ef57533c3b0f
+	github.com/go-macaron/csrf v0.0.0-20190131233648-3751b136073c
+	github.com/go-macaron/i18n v0.0.0-20190131234336-56731837a73b
 	github.com/go-macaron/inject v0.0.0-20160627170012-d8a0b8677191
 	github.com/go-macaron/session v0.0.0-20190131233854-0a0a789bf193
 	github.com/go-macaron/toolbox v0.0.0-20180818072302-a77f45a7ce90
@@ -110,11 +110,11 @@ require (
 	github.com/yohcop/openid-go v0.0.0-20160914080427-2c050d2dae53
 	go.etcd.io/bbolt v1.3.2 // indirect
 	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443
-	golang.org/x/net v0.0.0-20190613194153-d28f0bde5980
+	golang.org/x/net v0.0.0-20190619014844-b5b0513f8c1b
 	golang.org/x/oauth2 v0.0.0-20181101160152-c453e0c75759
-	golang.org/x/sys v0.0.0-20190618155005-516e3c20635f
+	golang.org/x/sys v0.0.0-20190620070143-6f217b454f45
 	golang.org/x/text v0.3.2
-	golang.org/x/tools v0.0.0-20190618163018-fdf1049a943a // indirect
+	golang.org/x/tools v0.0.0-20190620154339-431033348dd0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/asn1-ber.v1 v1.0.0-20150924051756-4e86f4367175 // indirect
 	gopkg.in/bufio.v1 v1.0.0-20140618132640-567b2bfa514e // indirect
@@ -135,4 +135,4 @@ require (
 	xorm.io/core v0.6.3
 )
 
-replace github.com/denisenkom/go-mssqldb => github.com/denisenkom/go-mssqldb v0.0.0-20180314172330-6a30f4e59a44
+replace github.com/denisenkom/go-mssqldb => github.com/denisenkom/go-mssqldb v0.0.0-20180315180555-6a30f4e59a44

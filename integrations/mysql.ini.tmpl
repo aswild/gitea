@@ -22,19 +22,19 @@ LOCAL_COPY_PATH = tmp/local-repo-mysql
 LOCAL_WIKI_PATH = tmp/local-wiki-mysql
 
 [server]
-SSH_DOMAIN              = localhost
-HTTP_PORT               = 3001
-ROOT_URL                = http://localhost:3001/
-DISABLE_SSH             = false
-SSH_LISTEN_HOST         = localhost
-SSH_PORT                = 2201
+SSH_DOMAIN       = localhost
+HTTP_PORT        = 3001
+ROOT_URL         = http://localhost:3001/
+DISABLE_SSH      = false
+SSH_LISTEN_HOST  = localhost
+SSH_PORT         = 2201
+START_SSH_SERVER = true
+LFS_START_SERVER = true
+LFS_CONTENT_PATH = data/lfs-mysql
+OFFLINE_MODE     = false
+LFS_JWT_SECRET   = Tv_MjmZuHqpIY6GFl12ebgkRAMt4RlWt0v4EHKSXO0w
+APP_DATA_PATH    = integrations/gitea-integration-mysql/data
 BUILTIN_SSH_SERVER_USER = git
-START_SSH_SERVER        = true
-LFS_START_SERVER        = true
-LFS_CONTENT_PATH        = data/lfs-mysql
-OFFLINE_MODE            = false
-LFS_JWT_SECRET          = Tv_MjmZuHqpIY6GFl12ebgkRAMt4RlWt0v4EHKSXO0w
-APP_DATA_PATH           = integrations/gitea-integration-mysql/data
 
 [mailer]
 ENABLED = true

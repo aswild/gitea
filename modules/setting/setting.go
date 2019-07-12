@@ -154,6 +154,7 @@ var (
 	MinPasswordLength     int
 	ImportLocalPaths      bool
 	DisableGitHooks       bool
+	PasswordHashAlgo      string
 
 	// Database settings
 	UseSQLite3       bool
@@ -286,7 +287,8 @@ var (
 	// Time settings
 	TimeFormat string
 
-	CSRFCookieName = "_csrf"
+	CSRFCookieName     = "_csrf"
+	CSRFCookieHTTPOnly = true
 
 	// Mirror settings
 	Mirror struct {
@@ -779,6 +781,9 @@ func NewContext() {
 	MinPasswordLength = sec.Key("MIN_PASSWORD_LENGTH").MustInt(6)
 	ImportLocalPaths = sec.Key("IMPORT_LOCAL_PATHS").MustBool(false)
 	DisableGitHooks = sec.Key("DISABLE_GIT_HOOKS").MustBool(false)
+	PasswordHashAlgo = sec.Key("PASSWORD_HASH_ALGO").MustString("pbkdf2")
+	CSRFCookieHTTPOnly = sec.Key("CSRF_COOKIE_HTTP_ONLY").MustBool(true)
+
 	InternalToken = loadInternalToken(sec)
 	IterateBufferSize = Cfg.Section("database").Key("ITERATE_BUFFER_SIZE").MustInt(50)
 	LogSQL = Cfg.Section("database").Key("LOG_SQL").MustBool(true)
