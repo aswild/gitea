@@ -163,8 +163,24 @@ func Listen(host string, port int, ciphers []string, keyExchanges []string, macs
 		},
 	}
 
-	keyPath := filepath.Join(setting.AppDataPath, "ssh/gogs.rsa")
-	if !com.IsExist(keyPath) {
+	// look for all supported ssh_host_*_key formats
+	keyFiles := make([]string, 0, 1)
+	for _, keyType := range [...]string{"rsa", "dsa", "ecdsa", "ed25519"} {
+		keyPath := filepath.Join(setting.AppDataPath, "ssh/ssh_host_"+keyType+"_key")
+		if com.IsExist(keyPath) {
+			keyFiles = append(keyFiles, keyPath)
+		}
+	}
+
+	// also check for legacy gogs.rsa, only if no openssh-named keys were found
+	oldKeyFile := filepath.Join(setting.AppDataPath, "ssh/gogs.rsa")
+	if len(keyFiles) == 0 && com.IsExist(oldKeyFile) {
+		keyFiles = append(keyFiles, oldKeyFile)
+	}
+
+	// if no keys found, create an RSA key
+	if len(keyFiles) == 0 {
+		keyPath := filepath.Join(setting.AppDataPath, "ssh/ssh_host_rsa_key")
 		filePath := filepath.Dir(keyPath)
 
 		if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
@@ -175,12 +191,17 @@ func Listen(host string, port int, ciphers []string, keyExchanges []string, macs
 		if err != nil {
 			log.Fatal("Failed to generate private key: %v", err)
 		}
-		log.Trace("New private key is generated: %s", keyPath)
+		log.Trace("SSH: New private key is generateed: %s", keyPath)
+		keyFiles = append(keyFiles, keyPath)
 	}
 
-	err := srv.SetOption(ssh.HostKeyFile(keyPath))
-	if err != nil {
-		log.Error("Failed to set Host Key. %s", err)
+	for _, keyPath := range keyFiles {
+		err := srv.SetOption(ssh.HostKeyFile(keyPath))
+		if err != nil {
+			log.Error("Failed to set SSH Host Key %s: %s", keyPath, err)
+		} else {
+			log.Trace("SSH: loaded host key %s", keyPath)
+		}
 	}
 
 	go func() {
