@@ -10,6 +10,11 @@ function htmlEncode(text) {
 var csrf;
 var suburl;
 
+// Disable Dropzone auto-discover because it's manually initialized
+if (typeof(Dropzone) !== "undefined") {
+    Dropzone.autoDiscover = false;
+}
+
 // Polyfill for IE9+ support (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/from)
 if (!Array.from) {
     Array.from = (function () {
@@ -1972,13 +1977,11 @@ $(document).ready(function () {
     }
 
     // Dropzone
-    var $dropzone = $('#dropzone');
+    const $dropzone = $('#dropzone');
     if ($dropzone.length > 0) {
-        // Disable auto discover for all elements:
-        Dropzone.autoDiscover = false;
+        const filenameDict = {};
 
-        var filenameDict = {};
-        $dropzone.dropzone({
+        new Dropzone("#dropzone", {
             url: $dropzone.data('upload-url'),
             headers: {"X-Csrf-Token": csrf},
             maxFiles: $dropzone.data('max-file'),
@@ -2006,7 +2009,7 @@ $(document).ready(function () {
                         });
                     }
                 })
-            }
+            },
         });
     }
 
@@ -2104,12 +2107,16 @@ $(document).ready(function () {
     });
 
     $('.issue-action').click(function () {
-        var action = this.dataset.action
-        var elementId = this.dataset.elementId
-        var issueIDs = $('.issue-checkbox').children('input:checked').map(function() {
+        let action = this.dataset.action;
+        let elementId = this.dataset.elementId;
+        let issueIDs = $('.issue-checkbox').children('input:checked').map(function() {
             return this.dataset.issueId;
         }).get().join();
-        var url = this.dataset.url
+        let url = this.dataset.url;
+        if (elementId === '0' && url.substr(-9) === '/assignee'){
+            elementId = '';
+            action = 'clear';
+        }
         updateIssuesMeta(url, action, issueIDs, elementId).then(reload);
     });
 
