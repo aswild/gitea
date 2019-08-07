@@ -24,7 +24,7 @@ BINDATA := modules/{options,public,templates}/bindata.go
 GOFILES := $(shell find . -name "*.go" -type f ! -path "./vendor/*" ! -path "*/bindata.go")
 GOFMT ?= gofmt -s
 
-GOFLAGS := -i -v
+GOFLAGS := -v
 EXTRA_GOFLAGS ?=
 
 TAGS ?=
