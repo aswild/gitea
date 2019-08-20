@@ -7,7 +7,8 @@ FROM golang:1.12-alpine3.10 AS build-env
 RUN apk --no-cache add build-base git
 
 ARG GITEA_VERSION
-ARG TAGS="sqlite sqlite_unlock_notify"
+#ARG TAGS="sqlite sqlite_unlock_notify"
+ARG TAGS
 ARG VERSION
 ENV TAGS "bindata $TAGS"
 
