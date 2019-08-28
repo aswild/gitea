@@ -410,8 +410,9 @@ func Download(ctx *context.Context) {
 	}
 
 	archivePath = path.Join(archivePath, base.ShortSha(commit.ID.String())+ext)
+	archivePrefix := strings.ReplaceAll(refName, "/", "-")
 	if !com.IsFile(archivePath) {
-		if err := commit.CreateArchive(archivePath, archiveType); err != nil {
+		if err := commit.CreateArchiveWithPrefix(archivePath, archiveType, archivePrefix); err != nil {
 			ctx.ServerError("Download -> CreateArchive "+archivePath, err)
 			return
 		}

@@ -21,7 +21,7 @@ const (
 )
 
 // CreateArchive create archive content to the target path
-func (c *Commit) CreateArchive(target string, archiveType ArchiveType) error {
+func (c *Commit) CreateArchiveWithPrefix(target string, archiveType ArchiveType, prefix string) error {
 	var format string
 	switch archiveType {
 	case ZIP:
@@ -32,6 +32,11 @@ func (c *Commit) CreateArchive(target string, archiveType ArchiveType) error {
 		return fmt.Errorf("unknown format: %v", archiveType)
 	}
 
-	_, err := NewCommand("archive", "--prefix="+filepath.Base(strings.TrimSuffix(c.repo.Path, ".git"))+"/", "--format="+format, "-o", target, c.ID.String()).RunInDir(c.repo.Path)
+	_, err := NewCommand("archive", "--prefix="+prefix+"/", "--format="+format, "-o", target, c.ID.String()).RunInDir(c.repo.Path)
 	return err
+}
+
+func (c *Commit) CreateArchive(target string, archiveType ArchiveType) error {
+	prefix := filepath.Base(strings.TrimSuffix(c.repo.Path, ".git"))
+	return c.CreateArchiveWithPrefix(target, archiveType, prefix)
 }
