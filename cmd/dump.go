@@ -70,8 +70,8 @@ func runDump(ctx *cli.Context) error {
 
 	if ctx.Bool("dbonly") {
 		targetDBType := ctx.String("database")
-		if len(targetDBType) > 0 && targetDBType != models.DbCfg.Type {
-			log.Printf("Dumping database %s => %s...", models.DbCfg.Type, targetDBType)
+		if len(targetDBType) > 0 && targetDBType != setting.Database.Type {
+			log.Printf("Dumping database %s => %s...", setting.Database.Type, targetDBType)
 		} else {
 			log.Printf("Dumping database...")
 		}
