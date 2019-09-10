@@ -1,7 +1,7 @@
 
 ###################################
 #Build stage
-FROM golang:1.12-alpine3.10 AS build-env
+FROM golang:1.13-alpine3.10 AS build-env
 
 #Build deps
 RUN apk --no-cache add build-base git
