@@ -3,11 +3,11 @@
 #Build stage
 FROM golang:1.13-alpine3.10 AS build-env
 
-#Build deps
-RUN apk --no-cache add build-base git
-
 ARG GOPROXY
 ENV GOPROXY ${GOPROXY:-direct}
+
+#Build deps
+RUN apk --no-cache add build-base git
 
 ARG GITEA_VERSION
 #ARG TAGS="sqlite sqlite_unlock_notify"
