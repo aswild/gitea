@@ -50,6 +50,9 @@ var (
 			Schedule   string
 			OlderThan  time.Duration
 		} `ini:"cron.deleted_branches_cleanup"`
+		UpdateMigrationPosterID struct {
+			Schedule string
+		} `ini:"cron.update_migration_poster_id"`
 	}{
 		UpdateMirror: struct {
 			Enabled    bool
@@ -116,6 +119,11 @@ var (
 			RunAtStart: true,
 			Schedule:   "@every 24h",
 			OlderThan:  24 * time.Hour,
+		},
+		UpdateMigrationPosterID: struct {
+			Schedule string
+		}{
+			Schedule: "@every 24h",
 		},
 	}
 )
