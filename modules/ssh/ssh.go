@@ -204,12 +204,7 @@ func Listen(host string, port int, ciphers []string, keyExchanges []string, macs
 		}
 	}
 
-	go func() {
-		err := srv.ListenAndServe()
-		if err != nil {
-			log.Error("Failed to serve with builtin SSH server. %s", err)
-		}
-	}()
+	go listen(&srv)
 
 }
 
