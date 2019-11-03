@@ -236,7 +236,7 @@ func RedirectToRepo(ctx *Context, redirectRepoID int64) {
 	if ctx.Req.URL.RawQuery != "" {
 		redirectPath += "?" + ctx.Req.URL.RawQuery
 	}
-	ctx.Redirect(redirectPath)
+	ctx.Redirect(path.Join(setting.AppSubURL, redirectPath))
 }
 
 func repoAssignment(ctx *Context, repo *models.Repository) {
@@ -414,8 +414,8 @@ func RepoAssignment() macaron.Handler {
 			}
 		}
 
-		// repo is empty and display enable
-		if ctx.Repo.Repository.IsEmpty || ctx.Repo.Repository.IsBeingCreated() {
+		// Disable everything when the repo is being created
+		if ctx.Repo.Repository.IsBeingCreated() {
 			ctx.Data["BranchName"] = ctx.Repo.Repository.DefaultBranch
 			return
 		}
@@ -426,6 +426,12 @@ func RepoAssignment() macaron.Handler {
 			return
 		}
 		ctx.Repo.GitRepo = gitRepo
+
+		// Stop at this point when the repo is empty.
+		if ctx.Repo.Repository.IsEmpty {
+			ctx.Data["BranchName"] = ctx.Repo.Repository.DefaultBranch
+			return
+		}
 
 		tags, err := ctx.Repo.GitRepo.GetTags()
 		if err != nil {

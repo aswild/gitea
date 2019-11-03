@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"code.gitea.io/gitea/models"
@@ -65,7 +66,7 @@ func Merge(pr *models.PullRequest, doer *models.User, baseGitRepo *git.Repositor
 		}
 	}()
 
-	headRepoPath := models.RepoPath(pr.HeadUserName, pr.HeadRepo.Name)
+	headRepoPath := pr.HeadRepo.RepoPath()
 
 	if err := git.InitRepository(tmpBasePath, false); err != nil {
 		return fmt.Errorf("git init: %v", err)
@@ -260,14 +261,17 @@ func Merge(pr *models.PullRequest, doer *models.User, baseGitRepo *git.Repositor
 		}
 	}
 
-	headUser, err := models.GetUserByName(pr.HeadUserName)
+	var headUser *models.User
+	err = pr.HeadRepo.GetOwner()
 	if err != nil {
 		if !models.IsErrUserNotExist(err) {
-			log.Error("Can't find user: %s for head repository - %v", pr.HeadUserName, err)
+			log.Error("Can't find user: %d for head repository - %v", pr.HeadRepo.OwnerID, err)
 			return err
 		}
-		log.Error("Can't find user: %s for head repository - defaulting to doer: %s - %v", pr.HeadUserName, doer.Name, err)
+		log.Error("Can't find user: %d for head repository - defaulting to doer: %s - %v", pr.HeadRepo.OwnerID, doer.Name, err)
 		headUser = doer
+	} else {
+		headUser = pr.HeadRepo.Owner
 	}
 
 	env := models.FullPushingEnvironment(
@@ -325,14 +329,29 @@ func Merge(pr *models.PullRequest, doer *models.User, baseGitRepo *git.Repositor
 	return nil
 }
 
+var escapedSymbols = regexp.MustCompile(`([*[?! \\])`)
+
 func getDiffTree(repoPath, baseBranch, headBranch string) (string, error) {
 	getDiffTreeFromBranch := func(repoPath, baseBranch, headBranch string) (string, error) {
 		var outbuf, errbuf strings.Builder
 		// Compute the diff-tree for sparse-checkout
-		if err := git.NewCommand("diff-tree", "--no-commit-id", "--name-only", "-r", "--root", baseBranch, headBranch, "--").RunInDirPipeline(repoPath, &outbuf, &errbuf); err != nil {
+		if err := git.NewCommand("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "--root", baseBranch, headBranch, "--").RunInDirPipeline(repoPath, &outbuf, &errbuf); err != nil {
 			return "", fmt.Errorf("git diff-tree [%s base:%s head:%s]: %s", repoPath, baseBranch, headBranch, errbuf.String())
 		}
 		return outbuf.String(), nil
+	}
+
+	scanNullTerminatedStrings := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		if atEOF && len(data) == 0 {
+			return 0, nil, nil
+		}
+		if i := bytes.IndexByte(data, '\x00'); i >= 0 {
+			return i + 1, data[0:i], nil
+		}
+		if atEOF {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
 	}
 
 	list, err := getDiffTreeFromBranch(repoPath, baseBranch, headBranch)
@@ -343,8 +362,14 @@ func getDiffTree(repoPath, baseBranch, headBranch string) (string, error) {
 	// Prefixing '/' for each entry, otherwise all files with the same name in subdirectories would be matched.
 	out := bytes.Buffer{}
 	scanner := bufio.NewScanner(strings.NewReader(list))
+	scanner.Split(scanNullTerminatedStrings)
 	for scanner.Scan() {
-		fmt.Fprintf(&out, "/%s\n", scanner.Text())
+		filepath := scanner.Text()
+		// escape '*', '?', '[', spaces and '!' prefix
+		filepath = escapedSymbols.ReplaceAllString(filepath, `\$1`)
+		// no necessary to escape the first '#' symbol because the first symbol is '/'
+		fmt.Fprintf(&out, "/%s\n", filepath)
 	}
+
 	return out.String(), nil
 }
