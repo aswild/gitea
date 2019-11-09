@@ -6,6 +6,8 @@
 package repo
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,6 +26,7 @@ import (
 	"code.gitea.io/gitea/modules/validation"
 	"code.gitea.io/gitea/routers/api/v1/convert"
 	mirror_service "code.gitea.io/gitea/services/mirror"
+	repo_service "code.gitea.io/gitea/services/repository"
 )
 
 var searchOrderByMap = map[string]map[string]models.SearchOrderBy{
@@ -207,7 +210,7 @@ func CreateUserRepo(ctx *context.APIContext, owner *models.User, opt api.CreateR
 	if opt.AutoInit && opt.Readme == "" {
 		opt.Readme = "Default"
 	}
-	repo, err := models.CreateRepository(ctx.User, owner, models.CreateRepoOptions{
+	repo, err := repo_service.CreateRepository(ctx.User, owner, models.CreateRepoOptions{
 		Name:        opt.Name,
 		Description: opt.Description,
 		IssueLabels: opt.IssueLabels,
@@ -224,17 +227,10 @@ func CreateUserRepo(ctx *context.APIContext, owner *models.User, opt api.CreateR
 			models.IsErrNamePatternNotAllowed(err) {
 			ctx.Error(422, "", err)
 		} else {
-			if repo != nil {
-				if err = models.DeleteRepository(ctx.User, ctx.User.ID, repo.ID); err != nil {
-					log.Error("DeleteRepository: %v", err)
-				}
-			}
 			ctx.Error(500, "CreateRepository", err)
 		}
 		return
 	}
-
-	notification.NotifyCreateRepository(ctx.User, owner, repo)
 
 	ctx.JSON(201, repo.APIFormat(models.AccessModeOwner))
 }
@@ -431,15 +427,54 @@ func Migrate(ctx *context.APIContext, form auth.MigrateRepoForm) {
 		opts.Releases = false
 	}
 
-	repo, err := migrations.MigrateRepository(ctx.User, ctxUser.Name, opts)
-	if err == nil {
-		notification.NotifyCreateRepository(ctx.User, ctxUser, repo)
-
-		log.Trace("Repository migrated: %s/%s", ctxUser.Name, form.RepoName)
-		ctx.JSON(201, repo.APIFormat(models.AccessModeAdmin))
+	repo, err := models.CreateRepository(ctx.User, ctxUser, models.CreateRepoOptions{
+		Name:        opts.RepoName,
+		Description: opts.Description,
+		OriginalURL: opts.CloneAddr,
+		IsPrivate:   opts.Private,
+		IsMirror:    opts.Mirror,
+		Status:      models.RepositoryBeingMigrated,
+	})
+	if err != nil {
+		handleMigrateError(ctx, ctxUser, remoteAddr, err)
 		return
 	}
 
+	opts.MigrateToRepoID = repo.ID
+
+	defer func() {
+		if e := recover(); e != nil {
+			var buf bytes.Buffer
+			fmt.Fprintf(&buf, "Handler crashed with error: %v", log.Stack(2))
+
+			err = errors.New(buf.String())
+		}
+
+		if err == nil {
+			repo.Status = models.RepositoryReady
+			if err := models.UpdateRepositoryCols(repo, "status"); err == nil {
+				notification.NotifyMigrateRepository(ctx.User, ctxUser, repo)
+				return
+			}
+		}
+
+		if repo != nil {
+			if errDelete := models.DeleteRepository(ctx.User, ctxUser.ID, repo.ID); errDelete != nil {
+				log.Error("DeleteRepository: %v", errDelete)
+			}
+		}
+	}()
+
+	if _, err = migrations.MigrateRepository(ctx.User, ctxUser.Name, opts); err != nil {
+		handleMigrateError(ctx, ctxUser, remoteAddr, err)
+		return
+	}
+
+	log.Trace("Repository migrated: %s/%s", ctxUser.Name, form.RepoName)
+	ctx.JSON(201, repo.APIFormat(models.AccessModeAdmin))
+}
+
+func handleMigrateError(ctx *context.APIContext, repoOwner *models.User, remoteAddr string, err error) {
 	switch {
 	case models.IsErrRepoAlreadyExist(err):
 		ctx.Error(409, "", "The repository with the same name already exists.")
@@ -448,7 +483,7 @@ func Migrate(ctx *context.APIContext, form auth.MigrateRepoForm) {
 	case migrations.IsTwoFactorAuthError(err):
 		ctx.Error(422, "", "Remote visit required two factors authentication.")
 	case models.IsErrReachLimitOfRepo(err):
-		ctx.Error(422, "", fmt.Sprintf("You have already reached your limit of %d repositories.", ctxUser.MaxCreationLimit()))
+		ctx.Error(422, "", fmt.Sprintf("You have already reached your limit of %d repositories.", repoOwner.MaxCreationLimit()))
 	case models.IsErrNameReserved(err):
 		ctx.Error(422, "", fmt.Sprintf("The username '%s' is reserved.", err.(models.ErrNameReserved).Name))
 	case models.IsErrNamePatternNotAllowed(err):
@@ -609,11 +644,7 @@ func updateBasicProperties(ctx *context.APIContext, opts api.EditRepoOption) err
 			return err
 		}
 
-		if err := models.RenameRepoAction(ctx.User, oldRepoName, repo); err != nil {
-			log.Error("RenameRepoAction: %v", err)
-			ctx.Error(http.StatusInternalServerError, "RenameRepoActions", err)
-			return err
-		}
+		notification.NotifyRenameRepository(ctx.User, repo, oldRepoName)
 
 		log.Trace("Repository name changed: %s/%s -> %s", ctx.Repo.Owner.Name, repo.Name, newRepoName)
 	}
@@ -876,18 +907,16 @@ func Delete(ctx *context.APIContext) {
 	owner := ctx.Repo.Owner
 	repo := ctx.Repo.Repository
 
-	if owner.IsOrganization() && !ctx.User.IsAdmin {
-		isOwner, err := owner.IsOwnedBy(ctx.User.ID)
-		if err != nil {
-			ctx.Error(500, "IsOwnedBy", err)
-			return
-		} else if !isOwner {
-			ctx.Error(403, "", "Given user is not owner of organization.")
-			return
-		}
+	canDelete, err := repo.CanUserDelete(ctx.User)
+	if err != nil {
+		ctx.Error(500, "CanUserDelete", err)
+		return
+	} else if !canDelete {
+		ctx.Error(403, "", "Given user is not owner of organization.")
+		return
 	}
 
-	if err := models.DeleteRepository(ctx.User, owner.ID, repo.ID); err != nil {
+	if err := repo_service.DeleteRepository(ctx.User, repo); err != nil {
 		ctx.Error(500, "DeleteRepository", err)
 		return
 	}

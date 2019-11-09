@@ -2263,6 +2263,7 @@ $(document).ready(function () {
 
     // Helpers.
     $('.delete-button').click(showDeletePopup);
+    $('.add-all-button').click(showAddAllPopup);
 
     $('.delete-branch-button').click(showDeletePopup);
 
@@ -2480,6 +2481,35 @@ function showDeletePopup() {
     }
 
     const dialog = $('.delete.modal' + filter);
+    dialog.find('.name').text($this.data('name'));
+
+    dialog.modal({
+        closable: false,
+        onApprove: function() {
+            if ($this.data('type') == "form") {
+                $($this.data('form')).submit();
+                return;
+            }
+
+            $.post($this.data('url'), {
+                "_csrf": csrf,
+                "id": $this.data("id")
+            }).done(function(data) {
+                window.location.href = data.redirect;
+            });
+        }
+    }).modal('show');
+    return false;
+}
+
+function showAddAllPopup() {
+    const $this = $(this);
+    let filter = "";
+    if ($this.attr("id")) {
+        filter += "#" + $this.attr("id")
+    }
+
+    const dialog = $('.addall.modal' + filter);
     dialog.find('.name').text($this.data('name'));
 
     dialog.modal({
@@ -2996,7 +3026,8 @@ function initFilterBranchTagDropdown(selector) {
     });
 }
 
-$(".commit-button").click(function() {
+$(".commit-button").click(function(e) {
+    e.preventDefault();
     $(this).parent().find('.commit-body').toggle();
 });
 
@@ -3256,10 +3287,16 @@ function deleteDependencyModal(id, type) {
 
 function initIssueList() {
     const repolink = $('#repolink').val();
+    const repoId = $('#repoId').val();
+    const crossRepoSearch = $('#crossRepoSearch').val();
+    let issueSearchUrl = suburl + '/api/v1/repos/' + repolink + '/issues?q={query}';
+    if (crossRepoSearch === 'true') {
+        issueSearchUrl = suburl + '/api/v1/repos/issues/search?q={query}&priority_repo_id=' + repoId;
+    }
     $('#new-dependency-drop-list')
         .dropdown({
             apiSettings: {
-                url: suburl + '/api/v1/repos/' + repolink + '/issues?q={query}',
+                url: issueSearchUrl,                
                 onResponse: function(response) {
                     const filteredResponse = {'success': true, 'results': []};
                     const currIssueId = $('#new-dependency-drop-list').data('issue-id');
@@ -3270,7 +3307,8 @@ function initIssueList() {
                             return;
                         }
                         filteredResponse.results.push({
-                            'name'  : '#' + issue.number + '&nbsp;' + htmlEncode(issue.title),
+                            'name'  : '#' + issue.number + ' ' + htmlEncode(issue.title) + 
+                                '<div class="text small dont-break-out">' + htmlEncode(issue.repository.full_name) + '</div>',
                             'value' : issue.id
                         });
                     });
