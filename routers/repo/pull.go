@@ -552,6 +552,7 @@ func ViewPullFiles(ctx *context.Context) {
 		ctx.Data["Username"] = pull.MustHeadUserName()
 		ctx.Data["Reponame"] = pull.HeadRepo.Name
 	}
+	ctx.Data["AfterCommitID"] = endCommitID
 
 	diff, err := gitdiff.GetDiffRangeWithWhitespaceBehavior(diffRepoPath,
 		startCommitID, endCommitID, setting.Git.MaxGitDiffLines,
@@ -714,8 +715,6 @@ func MergePullRequest(ctx *context.Context, form auth.MergePullRequestForm) {
 		ctx.ServerError("CreateOrStopIssueStopwatch", err)
 		return
 	}
-
-	notification.NotifyMergePullRequest(pr, ctx.User, ctx.Repo.GitRepo)
 
 	log.Trace("Pull request merged: %d", pr.ID)
 	ctx.Redirect(ctx.Repo.RepoLink + "/pulls/" + com.ToStr(pr.Index))
