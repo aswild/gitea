@@ -21,7 +21,7 @@ stop_container() {
 }
 
 echo "Starting postgres"
-container_id="$(docker run -d --rm "${container_opts[@]}" postgres)"
+container_id="$(docker run -d --rm "${container_opts[@]}" postgres:12)"
 [[ -n $container_id ]] || die "failed to create postgres container"
 trap stop_container EXIT
 
