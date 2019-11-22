@@ -424,7 +424,7 @@ npm-check:
 
 .PHONY: npm
 npm: npm-check
-	npm install --no-save
+	test -d node_modules/.bin || npm install --no-save
 
 .PHONY: npm-update
 npm-update: npm-check
