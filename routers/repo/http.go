@@ -8,6 +8,7 @@ package repo
 import (
 	"bytes"
 	"compress/gzip"
+	gocontext "context"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,11 +20,12 @@ import (
 	"time"
 
 	"code.gitea.io/gitea/models"
-	"code.gitea.io/gitea/modules/auth"
+	"code.gitea.io/gitea/modules/auth/sso"
 	"code.gitea.io/gitea/modules/base"
 	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/git"
 	"code.gitea.io/gitea/modules/log"
+	"code.gitea.io/gitea/modules/process"
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/timeutil"
 )
@@ -169,7 +171,7 @@ func HTTP(ctx *context.Context) {
 				// Assume password is token
 				authToken = authPasswd
 			}
-			uid := auth.CheckOAuthAccessToken(authToken)
+			uid := sso.CheckOAuthAccessToken(authToken)
 			if uid != 0 {
 				ctx.Data["IsApiToken"] = true
 
@@ -463,8 +465,10 @@ func serviceRPC(h serviceHandler, service string) {
 	// set this for allow pre-receive and post-receive execute
 	h.environ = append(h.environ, "SSH_ORIGINAL_COMMAND="+service)
 
+	ctx, cancel := gocontext.WithCancel(git.DefaultContext)
+	defer cancel()
 	var stderr bytes.Buffer
-	cmd := exec.Command(git.GitExecutable, service, "--stateless-rpc", h.dir)
+	cmd := exec.CommandContext(ctx, git.GitExecutable, service, "--stateless-rpc", h.dir)
 	cmd.Dir = h.dir
 	if service == "receive-pack" {
 		cmd.Env = append(os.Environ(), h.environ...)
@@ -472,6 +476,10 @@ func serviceRPC(h serviceHandler, service string) {
 	cmd.Stdout = h.w
 	cmd.Stdin = reqBody
 	cmd.Stderr = &stderr
+
+	pid := process.GetManager().Add(fmt.Sprintf("%s %s %s [repo_path: %s]", git.GitExecutable, service, "--stateless-rpc", h.dir), cancel)
+	defer process.GetManager().Remove(pid)
+
 	if err := cmd.Run(); err != nil {
 		log.Error("Fail to serve RPC(%s): %v - %s", service, err, stderr.String())
 		return
