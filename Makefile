@@ -449,7 +449,7 @@ release-compress:
 	cd $(DIST)/release/; for file in `find . -type f -name "*"`; do echo "compressing $${file}" && gxz -k -9 $${file}; done;
 
 node_modules: package-lock.json
-	npm install --no-save
+	npm install --no-save --loglevel=error
 
 .PHONY: npm-update
 npm-update: node-check node_modules
