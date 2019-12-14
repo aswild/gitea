@@ -7,7 +7,7 @@ ARG GOPROXY
 ENV GOPROXY ${GOPROXY:-direct}
 
 #Build deps
-RUN apk --no-cache add build-base git
+RUN apk --no-cache add build-base git nodejs npm
 
 ARG GITEA_VERSION
 #ARG TAGS="sqlite sqlite_unlock_notify"
@@ -21,7 +21,7 @@ WORKDIR ${GOPATH}/src/code.gitea.io/gitea
 
 #Checkout version if set
 RUN if [ -n "${GITEA_VERSION}" ]; then git checkout "${GITEA_VERSION}"; fi \
- && make GITEA_VERSION="${VERSION}" clean generate build
+ && make GITEA_VERSION="${VERSION}" clean build
 
 FROM alpine:3.10
 LABEL maintainer="maintainers@gitea.io"
