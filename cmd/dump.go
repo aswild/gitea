@@ -76,13 +76,13 @@ func runDump(ctx *cli.Context) error {
 	if ctx.Bool("dbonly") {
 		targetDBType := ctx.String("database")
 		if len(targetDBType) > 0 && targetDBType != setting.Database.Type {
-			log.Printf("Dumping database %s => %s...", setting.Database.Type, targetDBType)
+			log.Info("Dumping database %s => %s...", setting.Database.Type, targetDBType)
 		} else {
-			log.Printf("Dumping database...")
+			log.Info("Dumping database...")
 		}
 
 		if err := models.DumpDatabase("gitea-db.sql", targetDBType); err != nil {
-			log.Fatalf("Failed to dump database: %v", err)
+			log.Fatal("Failed to dump database: %v", err)
 		}
 		return nil
 	}
