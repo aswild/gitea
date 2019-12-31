@@ -26,7 +26,7 @@ RUN if [ -n "${GITEA_VERSION}" ]; then git checkout "${GITEA_VERSION}"; fi \
 FROM alpine:3.11
 LABEL maintainer="maintainers@gitea.io"
 
-RUN set -s && \
+RUN set -x && \
     apk --no-cache add \
         bash \
         ca-certificates \
