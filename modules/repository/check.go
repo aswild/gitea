@@ -53,7 +53,7 @@ func GitFsck(ctx context.Context) error {
 }
 
 // GitGcRepos calls 'git gc' to remove unnecessary files and optimize the local repository
-func GitGcRepos(ctx context.Context) error {
+func GitGcRepos(ctx context.Context) {
 	log.Trace("Doing: GitGcRepos")
 	args := append([]string{"gc"}, setting.Git.GCArgs...)
 
@@ -72,6 +72,7 @@ func GitGcRepos(ctx context.Context) error {
 			if err := repo.GetOwner(); err != nil {
 				return err
 			}
+			log.Trace("Running git gc on repository %v", repo.FullName())
 			if stdout, err := git.NewCommand(args...).
 				SetDescription(fmt.Sprintf("Repository Garbage Collection: %s", repo.FullName())).
 				RunInDirTimeout(
@@ -83,11 +84,10 @@ func GitGcRepos(ctx context.Context) error {
 			return nil
 		},
 	); err != nil {
-		return err
+		log.Error("GitGcRepos: %v", err)
 	}
 
 	log.Trace("Finished: GitGcRepos")
-	return nil
 }
 
 func gatherMissingRepoRecords() ([]*models.Repository, error) {

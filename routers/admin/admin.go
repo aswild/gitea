@@ -165,7 +165,7 @@ func Dashboard(ctx *context.Context) {
 			err = repo_module.DeleteMissingRepositories(ctx.User)
 		case gitGCRepos:
 			success = ctx.Tr("admin.dashboard.git_gc_repos_started")
-			err = repo_module.GitGcRepos(shutdownCtx)
+			go repo_module.GitGcRepos(shutdownCtx)
 		case syncSSHAuthorizedKey:
 			success = ctx.Tr("admin.dashboard.resync_all_sshkeys_success")
 			err = models.RewriteAllPublicKeys()
@@ -180,7 +180,7 @@ func Dashboard(ctx *context.Context) {
 			go graceful.GetManager().RunWithShutdownContext(models.SyncExternalUsers)
 		case gitFsck:
 			success = ctx.Tr("admin.dashboard.git_fsck_started")
-			err = repo_module.GitFsck(shutdownCtx)
+			go repo_module.GitFsck(shutdownCtx)
 		case deleteGeneratedRepositoryAvatars:
 			success = ctx.Tr("admin.dashboard.delete_generated_repository_avatars_success")
 			err = models.RemoveRandomAvatars()
