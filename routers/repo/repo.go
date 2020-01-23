@@ -1,4 +1,5 @@
 // Copyright 2014 The Gogs Authors. All rights reserved.
+// Copyright 2020 The Gitea Authors. All rights reserved.
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
@@ -6,6 +7,7 @@ package repo
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -18,6 +20,7 @@ import (
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/migrations"
 	"code.gitea.io/gitea/modules/setting"
+	"code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/task"
 	"code.gitea.io/gitea/modules/util"
 	repo_service "code.gitea.io/gitea/services/repository"
@@ -330,22 +333,29 @@ func MigratePost(ctx *context.Context, form auth.MigrateRepoForm) {
 		return
 	}
 
+	var gitServiceType = structs.PlainGitService
+	u, err := url.Parse(form.CloneAddr)
+	if err == nil && strings.EqualFold(u.Host, "github.com") {
+		gitServiceType = structs.GithubService
+	}
+
 	var opts = migrations.MigrateOptions{
-		OriginalURL:  form.CloneAddr,
-		CloneAddr:    remoteAddr,
-		RepoName:     form.RepoName,
-		Description:  form.Description,
-		Private:      form.Private || setting.Repository.ForcePrivate,
-		Mirror:       form.Mirror,
-		AuthUsername: form.AuthUsername,
-		AuthPassword: form.AuthPassword,
-		Wiki:         form.Wiki,
-		Issues:       form.Issues,
-		Milestones:   form.Milestones,
-		Labels:       form.Labels,
-		Comments:     true,
-		PullRequests: form.PullRequests,
-		Releases:     form.Releases,
+		OriginalURL:    form.CloneAddr,
+		GitServiceType: gitServiceType,
+		CloneAddr:      remoteAddr,
+		RepoName:       form.RepoName,
+		Description:    form.Description,
+		Private:        form.Private || setting.Repository.ForcePrivate,
+		Mirror:         form.Mirror,
+		AuthUsername:   form.AuthUsername,
+		AuthPassword:   form.AuthPassword,
+		Wiki:           form.Wiki,
+		Issues:         form.Issues,
+		Milestones:     form.Milestones,
+		Labels:         form.Labels,
+		Comments:       true,
+		PullRequests:   form.PullRequests,
+		Releases:       form.Releases,
 	}
 	if opts.Mirror {
 		opts.Issues = false
@@ -498,7 +508,10 @@ func Download(ctx *context.Context) {
 
 	archivePath = path.Join(archivePath, base.ShortSha(commit.ID.String())+ext)
 	if !com.IsFile(archivePath) {
-		if err := commit.CreateArchive(archivePath, archiveType); err != nil {
+		if err := commit.CreateArchive(archivePath, git.CreateArchiveOpts{
+			Format: archiveType,
+			Prefix: setting.Repository.PrefixArchiveFiles,
+		}); err != nil {
 			ctx.ServerError("Download -> CreateArchive "+archivePath, err)
 			return
 		}
