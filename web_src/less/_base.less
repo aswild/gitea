@@ -226,6 +226,14 @@ code,
         text-align: center;
     }
 
+    #navbar {
+        min-height: 52px;
+    }
+
+    #navbar .brand {
+        margin: 0;
+    }
+
     @media only screen and (max-width: 767px) {
         #navbar:not(.shown) > *:not(:first-child) {
             display: none;
@@ -678,7 +686,6 @@ footer {
     color: #888888;
 
     .container {
-        max-width: calc(100vw - 1rem) !important;
         .fa {
             width: 16px;
             text-align: center;
