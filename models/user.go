@@ -502,7 +502,7 @@ func (u *User) ValidatePassword(passwd string) bool {
 
 // IsPasswordSet checks if the password is set or left empty
 func (u *User) IsPasswordSet() bool {
-	return len(u.Passwd) > 0
+	return !u.ValidatePassword("")
 }
 
 // UploadAvatar saves custom avatar for user.
@@ -1713,6 +1713,15 @@ func SyncExternalUsers() {
 			if err != nil {
 				log.Error("SyncExternalUsers LDAP source failure [%s], skipped", s.Name)
 				continue
+			}
+
+			if len(sr) == 0 {
+				if !s.LDAP().AllowDeactivateAll {
+					log.Error("LDAP search found no entries but did not report an error. Refusing to deactivate all users")
+					continue
+				} else {
+					log.Warn("LDAP search found no entries but did not report an error. All users will be deactivated as per settings")
+				}
 			}
 
 			for _, su := range sr {
