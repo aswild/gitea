@@ -381,6 +381,7 @@ func (issue *Issue) apiFormat(e Engine) *api.Issue {
 	apiIssue := &api.Issue{
 		ID:       issue.ID,
 		URL:      issue.APIURL(),
+		HTMLURL:  issue.HTMLURL(),
 		Index:    issue.Index,
 		Poster:   issue.Poster.APIFormat(),
 		Title:    issue.Title,
@@ -402,11 +403,12 @@ func (issue *Issue) apiFormat(e Engine) *api.Issue {
 		apiIssue.Closed = issue.ClosedUnix.AsTimePtr()
 	}
 
+	issue.loadMilestone(e)
 	if issue.Milestone != nil {
 		apiIssue.Milestone = issue.Milestone.APIFormat()
 	}
-	issue.loadAssignees(e)
 
+	issue.loadAssignees(e)
 	if len(issue.Assignees) > 0 {
 		for _, assignee := range issue.Assignees {
 			apiIssue.Assignees = append(apiIssue.Assignees, assignee.APIFormat())
@@ -436,7 +438,7 @@ func (issue *Issue) HashTag() string {
 
 // IsPoster returns true if given user by ID is the poster.
 func (issue *Issue) IsPoster(uid int64) bool {
-	return issue.PosterID == uid
+	return issue.OriginalAuthorID == 0 && issue.PosterID == uid
 }
 
 func (issue *Issue) hasLabel(e Engine, labelID int64) bool {

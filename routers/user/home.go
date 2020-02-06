@@ -142,11 +142,17 @@ func Dashboard(ctx *context.Context) {
 	ctx.Data["MirrorCount"] = len(mirrors)
 	ctx.Data["Mirrors"] = mirrors
 
+	requestingUserID := int64(0)
+	if ctx.User != nil {
+		requestingUserID = ctx.User.ID
+	}
+
 	retrieveFeeds(ctx, models.GetFeedsOptions{
-		RequestedUser:   ctxUser,
-		IncludePrivate:  true,
-		OnlyPerformedBy: false,
-		IncludeDeleted:  false,
+		RequestedUser:    ctxUser,
+		RequestingUserID: requestingUserID,
+		IncludePrivate:   true,
+		OnlyPerformedBy:  false,
+		IncludeDeleted:   false,
 		ExcludeTypes: []models.ActionType{
 			models.ActionMirrorSyncPush,
 			models.ActionMirrorSyncCreate,
@@ -524,13 +530,17 @@ func Issues(ctx *context.Context) {
 		}
 	}
 
-	issueStats, err := models.GetUserIssueStats(models.UserIssueStatsOptions{
+	issueStatsOpts := models.UserIssueStatsOptions{
 		UserID:      ctxUser.ID,
 		UserRepoIDs: userRepoIDs,
 		FilterMode:  filterMode,
 		IsPull:      isPullList,
 		IsClosed:    isShowClosed,
-	})
+	}
+	if len(repoIDs) > 0 {
+		issueStatsOpts.UserRepoIDs = repoIDs
+	}
+	issueStats, err := models.GetUserIssueStats(issueStatsOpts)
 	if err != nil {
 		ctx.ServerError("GetUserIssueStats", err)
 		return

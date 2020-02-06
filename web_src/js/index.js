@@ -22,6 +22,9 @@ if (typeof (Dropzone) !== 'undefined') {
   Dropzone.autoDiscover = false;
 }
 
+// Silence fomantic's error logging when tabs are used without a target content element
+$.fn.tab.settings.silent = true;
+
 function initCommentPreviewTab($form) {
   const $tabMenu = $form.find('.tabular.menu');
   $tabMenu.find('.item').tab();
@@ -320,12 +323,14 @@ function initSimpleMDEImagePaste(simplemde, files) {
   });
 }
 
+let autoSimpleMDE;
+
 function initCommentForm() {
   if ($('.comment.form').length === 0) {
     return;
   }
 
-  setCommentSimpleMDE($('.comment.form textarea:not(.review-textarea)'));
+  autoSimpleMDE = setCommentSimpleMDE($('.comment.form textarea:not(.review-textarea)'));
   initBranchSelector();
   initCommentPreviewTab($('.comment.form'));
   initImagePaste($('.comment.form textarea'));
@@ -823,25 +828,27 @@ function initRepository() {
     $('.quote-reply').click(function (event) {
       $(this).closest('.dropdown').find('.menu').toggle('visible');
       const target = $(this).data('target');
+      const quote = $(`#comment-${target}`).text().replace(/\n/g, '\n> ');
+      const content = `> ${quote}\n\n`;
 
       let $content;
       if ($(this).hasClass('quote-reply-diff')) {
         const $parent = $(this).closest('.comment-code-cloud');
         $parent.find('button.comment-form-reply').click();
         $content = $parent.find('[name="content"]');
-      } else {
-        $content = $('#content');
+        if ($content.val() !== '') {
+          $content.val(`${$content.val()}\n\n${content}`);
+        } else {
+          $content.val(`${content}`);
+        }
+        $content.focus();
+      } else if (autoSimpleMDE !== null) {
+        if (autoSimpleMDE.value() !== '') {
+          autoSimpleMDE.value(`${autoSimpleMDE.value()}\n\n${content}`);
+        } else {
+          autoSimpleMDE.value(`${content}`);
+        }
       }
-
-      const quote = $(`#comment-${target}`).text().replace(/\n/g, '\n> ');
-      const content = `> ${quote}\n\n`;
-
-      if ($content.val() !== '') {
-        $content.val(`${$content.val()}\n\n${content}`);
-      } else {
-        $content.val(`${content}`);
-      }
-      $content.focus();
       event.preventDefault();
     });
 
@@ -1355,7 +1362,16 @@ function initWikiForm() {
         }, '|',
         'unordered-list', 'ordered-list', '|',
         'link', 'image', 'table', 'horizontal-rule', '|',
-        'clean-block', 'preview', 'fullscreen', 'side-by-side']
+        'clean-block', 'preview', 'fullscreen', 'side-by-side', '|',
+        {
+          name: 'revert-to-textarea',
+          action(e) {
+            e.toTextArea();
+          },
+          className: 'fa fa-file',
+          title: 'Revert to simple textarea',
+        },
+      ]
     });
     $(simplemde.codemirror.getInputField()).addClass('js-quick-submit');
 
@@ -1459,7 +1475,16 @@ function setSimpleMDE($editArea) {
       'code', 'quote', '|',
       'unordered-list', 'ordered-list', '|',
       'link', 'image', 'table', 'horizontal-rule', '|',
-      'clean-block', 'preview', 'fullscreen', 'side-by-side']
+      'clean-block', 'preview', 'fullscreen', 'side-by-side', '|',
+      {
+        name: 'revert-to-textarea',
+        action(e) {
+          e.toTextArea();
+        },
+        className: 'fa fa-file',
+        title: 'Revert to simple textarea',
+      },
+    ]
   });
 
   return true;
@@ -1481,7 +1506,16 @@ function setCommentSimpleMDE($editArea) {
       'code', 'quote', '|',
       'unordered-list', 'ordered-list', '|',
       'link', 'image', 'table', 'horizontal-rule', '|',
-      'clean-block']
+      'clean-block', '|',
+      {
+        name: 'revert-to-textarea',
+        action(e) {
+          e.toTextArea();
+        },
+        className: 'fa fa-file',
+        title: 'Revert to simple textarea',
+      },
+    ]
   });
   simplemde.codemirror.setOption('extraKeys', {
     Enter: () => {
@@ -3450,9 +3484,10 @@ function initIssueList() {
   const repolink = $('#repolink').val();
   const repoId = $('#repoId').val();
   const crossRepoSearch = $('#crossRepoSearch').val();
-  let issueSearchUrl = `${suburl}/api/v1/repos/${repolink}/issues?q={query}`;
+  const tp = $('#type').val();
+  let issueSearchUrl = `${suburl}/api/v1/repos/${repolink}/issues?q={query}&type=${tp}`;
   if (crossRepoSearch === 'true') {
-    issueSearchUrl = `${suburl}/api/v1/repos/issues/search?q={query}&priority_repo_id=${repoId}`;
+    issueSearchUrl = `${suburl}/api/v1/repos/issues/search?q={query}&priority_repo_id=${repoId}&type=${tp}`;
   }
   $('#new-dependency-drop-list')
     .dropdown({

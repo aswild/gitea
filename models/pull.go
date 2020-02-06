@@ -35,6 +35,7 @@ const (
 	PullRequestStatusChecking
 	PullRequestStatusMergeable
 	PullRequestStatusManuallyMerged
+	PullRequestStatusError
 )
 
 // PullRequest represents relation between pull request and repositories.
@@ -67,7 +68,11 @@ type PullRequest struct {
 // MustHeadUserName returns the HeadRepo's username if failed return blank
 func (pr *PullRequest) MustHeadUserName() string {
 	if err := pr.LoadHeadRepo(); err != nil {
-		log.Error("LoadHeadRepo: %v", err)
+		if !IsErrRepoNotExist(err) {
+			log.Error("LoadHeadRepo: %v", err)
+		} else {
+			log.Warn("LoadHeadRepo %d but repository does not exist: %v", pr.HeadRepoID, err)
+		}
 		return ""
 	}
 	return pr.HeadRepo.MustOwnerName()
@@ -384,6 +389,13 @@ func (pr *PullRequest) GetDefaultSquashMessage() string {
 		log.Error("LoadIssue: %v", err)
 		return ""
 	}
+	if err := pr.LoadBaseRepo(); err != nil {
+		log.Error("LoadBaseRepo: %v", err)
+		return ""
+	}
+	if pr.BaseRepo.UnitEnabled(UnitTypeExternalTracker) {
+		return fmt.Sprintf("%s (!%d)", pr.Issue.Title, pr.Issue.Index)
+	}
 	return fmt.Sprintf("%s (#%d)", pr.Issue.Title, pr.Issue.Index)
 }
 
@@ -408,7 +420,7 @@ func (pr *PullRequest) apiFormat(e Engine) *api.PullRequest {
 		err        error
 	)
 	if err = pr.Issue.loadRepo(e); err != nil {
-		log.Error("loadRepo[%d]: %v", pr.ID, err)
+		log.Error("pr.Issue.loadRepo[%d]: %v", pr.ID, err)
 		return nil
 	}
 	apiIssue := pr.Issue.apiFormat(e)
@@ -419,17 +431,12 @@ func (pr *PullRequest) apiFormat(e Engine) *api.PullRequest {
 			return nil
 		}
 	}
-	if pr.HeadRepo == nil {
+	if pr.HeadRepoID != 0 && pr.HeadRepo == nil {
 		pr.HeadRepo, err = getRepositoryByID(e, pr.HeadRepoID)
-		if err != nil {
+		if err != nil && !IsErrRepoNotExist(err) {
 			log.Error("GetRepositoryById[%d]: %v", pr.ID, err)
 			return nil
 		}
-	}
-
-	if err = pr.Issue.loadRepo(e); err != nil {
-		log.Error("pr.Issue.loadRepo[%d]: %v", pr.ID, err)
-		return nil
 	}
 
 	apiPullRequest := &api.PullRequest{
@@ -483,37 +490,45 @@ func (pr *PullRequest) apiFormat(e Engine) *api.PullRequest {
 		apiPullRequest.Base = apiBaseBranchInfo
 	}
 
-	headBranch, err = pr.HeadRepo.GetBranch(pr.HeadBranch)
-	if err != nil {
-		if git.IsErrBranchNotExist(err) {
-			apiPullRequest.Head = nil
-		} else {
-			log.Error("GetBranch[%s]: %v", pr.HeadBranch, err)
-			return nil
-		}
-	} else {
-		apiHeadBranchInfo := &api.PRBranchInfo{
-			Name:       pr.HeadBranch,
-			Ref:        pr.HeadBranch,
-			RepoID:     pr.HeadRepoID,
-			Repository: pr.HeadRepo.innerAPIFormat(e, AccessModeNone, false),
-		}
-		headCommit, err = headBranch.GetCommit()
+	if pr.HeadRepo != nil {
+		headBranch, err = pr.HeadRepo.GetBranch(pr.HeadBranch)
 		if err != nil {
-			if git.IsErrNotExist(err) {
-				apiHeadBranchInfo.Sha = ""
+			if git.IsErrBranchNotExist(err) {
+				apiPullRequest.Head = nil
 			} else {
-				log.Error("GetCommit[%s]: %v", headBranch.Name, err)
+				log.Error("GetBranch[%s]: %v", pr.HeadBranch, err)
 				return nil
 			}
 		} else {
-			apiHeadBranchInfo.Sha = headCommit.ID.String()
+			apiHeadBranchInfo := &api.PRBranchInfo{
+				Name:       pr.HeadBranch,
+				Ref:        pr.HeadBranch,
+				RepoID:     pr.HeadRepoID,
+				Repository: pr.HeadRepo.innerAPIFormat(e, AccessModeNone, false),
+			}
+			headCommit, err = headBranch.GetCommit()
+			if err != nil {
+				if git.IsErrNotExist(err) {
+					apiHeadBranchInfo.Sha = ""
+				} else {
+					log.Error("GetCommit[%s]: %v", headBranch.Name, err)
+					return nil
+				}
+			} else {
+				apiHeadBranchInfo.Sha = headCommit.ID.String()
+			}
+			apiPullRequest.Head = apiHeadBranchInfo
 		}
-		apiPullRequest.Head = apiHeadBranchInfo
+	} else {
+		apiPullRequest.Head = &api.PRBranchInfo{
+			Name:   pr.HeadBranch,
+			Ref:    fmt.Sprintf("refs/pull/%d/head", pr.Index),
+			RepoID: -1,
+		}
 	}
 
 	if pr.Status != PullRequestStatusChecking {
-		mergeable := pr.Status != PullRequestStatusConflict && !pr.IsWorkInProgress()
+		mergeable := !(pr.Status == PullRequestStatusConflict || pr.Status == PullRequestStatusError) && !pr.IsWorkInProgress()
 		apiPullRequest.Mergeable = mergeable
 	}
 	if pr.HasMerged {

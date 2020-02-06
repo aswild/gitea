@@ -24,6 +24,8 @@ import (
 var (
 	_ base.Downloader        = &GithubDownloaderV3{}
 	_ base.DownloaderFactory = &GithubDownloaderV3Factory{}
+	// GithubLimitRateRemaining limit to wait for new rate to apply
+	GithubLimitRateRemaining = 0
 )
 
 func init() {
@@ -115,7 +117,7 @@ func (g *GithubDownloaderV3) SetContext(ctx context.Context) {
 }
 
 func (g *GithubDownloaderV3) sleep() {
-	for g.rate != nil && g.rate.Remaining <= 0 {
+	for g.rate != nil && g.rate.Remaining <= GithubLimitRateRemaining {
 		timer := time.NewTimer(time.Until(g.rate.Reset.Time))
 		select {
 		case <-g.ctx.Done():
@@ -124,13 +126,22 @@ func (g *GithubDownloaderV3) sleep() {
 		case <-timer.C:
 		}
 
-		rates, _, err := g.client.RateLimits(g.ctx)
+		err := g.RefreshRate()
 		if err != nil {
 			log.Error("g.client.RateLimits: %s", err)
 		}
-
-		g.rate = rates.GetCore()
 	}
+}
+
+// RefreshRate update the current rate (doesn't count in rate limit)
+func (g *GithubDownloaderV3) RefreshRate() error {
+	rates, _, err := g.client.RateLimits(g.ctx)
+	if err != nil {
+		return err
+	}
+
+	g.rate = rates.GetCore()
+	return nil
 }
 
 // GetRepoInfo returns a repository information
@@ -385,6 +396,7 @@ func (g *GithubDownloaderV3) GetIssues(page, perPage int) ([]*base.Issue, bool, 
 			Milestone:   milestone,
 			State:       *issue.State,
 			Created:     *issue.CreatedAt,
+			Updated:     *issue.UpdatedAt,
 			Labels:      labels,
 			Reactions:   reactions,
 			Closed:      issue.ClosedAt,
@@ -428,6 +440,7 @@ func (g *GithubDownloaderV3) GetComments(issueNumber int64) ([]*base.Comment, er
 				PosterEmail: email,
 				Content:     *comment.Body,
 				Created:     *comment.CreatedAt,
+				Updated:     *comment.UpdatedAt,
 				Reactions:   reactions,
 			})
 		}
@@ -523,6 +536,7 @@ func (g *GithubDownloaderV3) GetPullRequests(page, perPage int) ([]*base.PullReq
 			Milestone:      milestone,
 			State:          *pr.State,
 			Created:        *pr.CreatedAt,
+			Updated:        *pr.UpdatedAt,
 			Closed:         pr.ClosedAt,
 			Labels:         labels,
 			Merged:         merged,
