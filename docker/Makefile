@@ -1,7 +1,7 @@
 #Makefile related to docker
 
 DOCKER_IMAGE ?= aswild/gitea
-DOCKER_TAG ?= latest
+DOCKER_TAG ?= stable
 DOCKER_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
 ifeq ($(C),0)
