@@ -15,7 +15,6 @@ import (
 	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/git"
 	"code.gitea.io/gitea/modules/log"
-	"code.gitea.io/gitea/modules/notification"
 	api "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/timeutil"
 	issue_service "code.gitea.io/gitea/services/issue"
@@ -315,8 +314,6 @@ func CreatePullRequest(ctx *context.APIContext, form api.CreatePullRequestOption
 		ctx.Error(http.StatusInternalServerError, "NewPullRequest", err)
 		return
 	}
-
-	notification.NotifyNewPullRequest(pr)
 
 	log.Trace("Pull request created: %d/%d", repo.ID, prIssue.ID)
 	ctx.JSON(http.StatusCreated, pr.APIFormat())
@@ -647,6 +644,14 @@ func MergePullRequest(ctx *context.APIContext, form auth.MergePullRequestForm) {
 			ctx.JSON(http.StatusConflict, conflictError)
 		} else if models.IsErrMergePushOutOfDate(err) {
 			ctx.Error(http.StatusConflict, "Merge", "merge push out of date")
+			return
+		} else if models.IsErrPushRejected(err) {
+			errPushRej := err.(models.ErrPushRejected)
+			if len(errPushRej.Message) == 0 {
+				ctx.Error(http.StatusConflict, "Merge", "PushRejected without remote error message")
+				return
+			}
+			ctx.Error(http.StatusConflict, "Merge", "PushRejected with remote message: "+errPushRej.Message)
 			return
 		}
 		ctx.Error(http.StatusInternalServerError, "Merge", err)

@@ -18,6 +18,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -87,6 +88,9 @@ var (
 
 	// ErrUnsupportedLoginType login source is unknown error
 	ErrUnsupportedLoginType = errors.New("Login source is unknown")
+
+	// Characters prohibited in a user name (anything except A-Za-z0-9_.-)
+	alphaDashDotPattern = regexp.MustCompile(`[^\w-\.]`)
 )
 
 // User represents the object of individual and member of organization.
@@ -708,9 +712,11 @@ func (u *User) DisplayName() string {
 // GetDisplayName returns full name if it's not empty and DEFAULT_SHOW_FULL_NAME is set,
 // returns username otherwise.
 func (u *User) GetDisplayName() string {
-	trimmed := strings.TrimSpace(u.FullName)
-	if len(trimmed) > 0 && setting.UI.DefaultShowFullName {
-		return trimmed
+	if setting.UI.DefaultShowFullName {
+		trimmed := strings.TrimSpace(u.FullName)
+		if len(trimmed) > 0 {
+			return trimmed
+		}
 	}
 	return u.Name
 }
@@ -870,6 +876,11 @@ func isUsableName(names, patterns []string, name string) error {
 
 // IsUsableUsername returns an error when a username is reserved
 func IsUsableUsername(name string) error {
+	// Validate username make sure it satisfies requirement.
+	if alphaDashDotPattern.MatchString(name) {
+		// Note: usually this error is normally caught up earlier in the UI
+		return ErrNameCharsNotAllowed{Name: name}
+	}
 	return isUsableName(reservedUsernames, reservedUserPatterns, name)
 }
 
@@ -989,7 +1000,7 @@ func VerifyActiveEmailCode(code, email string) *EmailAddress {
 		data := com.ToStr(user.ID) + email + user.LowerName + user.Passwd + user.Rands
 
 		if base.VerifyTimeLimitCode(data, minutes, prefix) {
-			emailAddress := &EmailAddress{Email: email}
+			emailAddress := &EmailAddress{UID: user.ID, Email: email}
 			if has, _ := x.Get(emailAddress); has {
 				return emailAddress
 			}
