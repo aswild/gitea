@@ -140,6 +140,7 @@ var (
 		JWTSecretBase64 string        `ini:"LFS_JWT_SECRET"`
 		JWTSecretBytes  []byte        `ini:"-"`
 		HTTPAuthExpiry  time.Duration `ini:"LFS_HTTP_AUTH_EXPIRY"`
+		MaxFileSize     int64         `ini:"LFS_MAX_FILE_SIZE"`
 	}
 
 	// Security settings
@@ -511,6 +512,7 @@ func SetCustomPathAndConf(providedCustom, providedConf, providedWorkPath string)
 		CustomConf = path.Join(CustomPath, "conf/app.ini")
 	} else if !filepath.IsAbs(CustomConf) {
 		CustomConf = path.Join(CustomPath, CustomConf)
+		log.Warn("Using 'custom' directory as relative origin for configuration file: '%s'", CustomConf)
 	}
 }
 

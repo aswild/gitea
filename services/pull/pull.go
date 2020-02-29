@@ -324,6 +324,10 @@ func PushToBaseRepo(pr *models.PullRequest) (err error) {
 		}
 	}()
 
+	if err := pr.LoadHeadRepo(); err != nil {
+		log.Error("Unable to load head repository for PR[%d] Error: %v", pr.ID, err)
+		return err
+	}
 	headRepoPath := pr.HeadRepo.RepoPath()
 
 	if err := git.Clone(headRepoPath, tmpBasePath, git.CloneRepoOptions{
@@ -340,6 +344,10 @@ func PushToBaseRepo(pr *models.PullRequest) (err error) {
 		return fmt.Errorf("OpenRepository: %v", err)
 	}
 
+	if err := pr.LoadBaseRepo(); err != nil {
+		log.Error("Unable to load base repository for PR[%d] Error: %v", pr.ID, err)
+		return err
+	}
 	if err := gitRepo.AddRemote("base", pr.BaseRepo.RepoPath(), false); err != nil {
 		return fmt.Errorf("tmpGitRepo.AddRemote: %v", err)
 	}
@@ -407,7 +415,7 @@ func CloseBranchPulls(doer *models.User, repoID int64, branch string) error {
 
 	var errs errlist
 	for _, pr := range prs {
-		if err = issue_service.ChangeStatus(pr.Issue, doer, true); err != nil && !models.IsErrIssueWasClosed(err) {
+		if err = issue_service.ChangeStatus(pr.Issue, doer, true); err != nil && !models.IsErrPullWasClosed(err) {
 			errs = append(errs, err)
 		}
 	}
@@ -436,7 +444,7 @@ func CloseRepoBranchesPulls(doer *models.User, repo *models.Repository) error {
 		}
 
 		for _, pr := range prs {
-			if err = issue_service.ChangeStatus(pr.Issue, doer, true); err != nil && !models.IsErrIssueWasClosed(err) {
+			if err = issue_service.ChangeStatus(pr.Issue, doer, true); err != nil && !models.IsErrPullWasClosed(err) {
 				errs = append(errs, err)
 			}
 		}

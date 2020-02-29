@@ -65,6 +65,8 @@ func main() {
 		cmd.CmdKeys,
 		cmd.CmdConvert,
 		cmd.CmdDoctor,
+		cmd.CmdManager,
+		cmd.Cmdembedded,
 	}
 	// Now adjust these commands to add our global configuration options
 

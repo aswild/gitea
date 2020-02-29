@@ -12,13 +12,28 @@ import (
 	"strconv"
 	"strings"
 
-	api "code.gitea.io/gitea/modules/structs"
-
 	"xorm.io/builder"
 	"xorm.io/xorm"
 )
 
-var labelColorPattern = regexp.MustCompile("#([a-fA-F0-9]{6})")
+// LabelColorPattern is a regexp witch can validate LabelColor
+var LabelColorPattern = regexp.MustCompile("^#[0-9a-fA-F]{6}$")
+
+// Label represents a label of repository for issues.
+type Label struct {
+	ID              int64 `xorm:"pk autoincr"`
+	RepoID          int64 `xorm:"INDEX"`
+	Name            string
+	Description     string
+	Color           string `xorm:"VARCHAR(7)"`
+	NumIssues       int
+	NumClosedIssues int
+	NumOpenIssues   int    `xorm:"-"`
+	IsChecked       bool   `xorm:"-"`
+	QueryString     string `xorm:"-"`
+	IsSelected      bool   `xorm:"-"`
+	IsExcluded      bool   `xorm:"-"`
+}
 
 // GetLabelTemplateFile loads the label template file by given name,
 // then parses and returns a list of name-color pairs and optionally description.
@@ -43,7 +58,11 @@ func GetLabelTemplateFile(name string) ([][3]string, error) {
 			return nil, fmt.Errorf("line is malformed: %s", line)
 		}
 
-		if !labelColorPattern.MatchString(fields[0]) {
+		color := strings.Trim(fields[0], " ")
+		if len(color) == 6 {
+			color = "#" + color
+		}
+		if !LabelColorPattern.MatchString(color) {
 			return nil, fmt.Errorf("bad HTML color code in line: %s", line)
 		}
 
@@ -54,36 +73,10 @@ func GetLabelTemplateFile(name string) ([][3]string, error) {
 		}
 
 		fields[1] = strings.TrimSpace(fields[1])
-		list = append(list, [3]string{fields[1], fields[0], description})
+		list = append(list, [3]string{fields[1], color, description})
 	}
 
 	return list, nil
-}
-
-// Label represents a label of repository for issues.
-type Label struct {
-	ID              int64 `xorm:"pk autoincr"`
-	RepoID          int64 `xorm:"INDEX"`
-	Name            string
-	Description     string
-	Color           string `xorm:"VARCHAR(7)"`
-	NumIssues       int
-	NumClosedIssues int
-	NumOpenIssues   int    `xorm:"-"`
-	IsChecked       bool   `xorm:"-"`
-	QueryString     string `xorm:"-"`
-	IsSelected      bool   `xorm:"-"`
-	IsExcluded      bool   `xorm:"-"`
-}
-
-// APIFormat converts a Label to the api.Label format
-func (label *Label) APIFormat() *api.Label {
-	return &api.Label{
-		ID:          label.ID,
-		Name:        label.Name,
-		Color:       strings.TrimLeft(label.Color, "#"),
-		Description: label.Description,
-	}
 }
 
 // CalOpenIssues calculates the open issues of label.
@@ -152,7 +145,7 @@ func LoadLabelsFormatted(labelTemplate string) (string, error) {
 	return strings.Join(labels, ", "), err
 }
 
-func initalizeLabels(e Engine, repoID int64, labelTemplate string) error {
+func initializeLabels(e Engine, repoID int64, labelTemplate string) error {
 	list, err := GetLabelTemplateFile(labelTemplate)
 	if err != nil {
 		return ErrIssueLabelTemplateLoad{labelTemplate, err}
@@ -175,9 +168,9 @@ func initalizeLabels(e Engine, repoID int64, labelTemplate string) error {
 	return nil
 }
 
-// InitalizeLabels adds a label set to a repository using a template
-func InitalizeLabels(ctx DBContext, repoID int64, labelTemplate string) error {
-	return initalizeLabels(ctx.e, repoID, labelTemplate)
+// InitializeLabels adds a label set to a repository using a template
+func InitializeLabels(ctx DBContext, repoID int64, labelTemplate string) error {
+	return initializeLabels(ctx.e, repoID, labelTemplate)
 }
 
 func newLabel(e Engine, label *Label) error {
@@ -187,6 +180,9 @@ func newLabel(e Engine, label *Label) error {
 
 // NewLabel creates a new label for a repository
 func NewLabel(label *Label) error {
+	if !LabelColorPattern.MatchString(label.Color) {
+		return fmt.Errorf("bad color code: %s", label.Color)
+	}
 	return newLabel(x, label)
 }
 
@@ -198,6 +194,9 @@ func NewLabels(labels ...*Label) error {
 		return err
 	}
 	for _, label := range labels {
+		if !LabelColorPattern.MatchString(label.Color) {
+			return fmt.Errorf("bad color code: %s", label.Color)
+		}
 		if err := newLabel(sess, label); err != nil {
 			return err
 		}
@@ -359,6 +358,9 @@ func updateLabel(e Engine, l *Label) error {
 
 // UpdateLabel updates label information.
 func UpdateLabel(l *Label) error {
+	if !LabelColorPattern.MatchString(l.Color) {
+		return fmt.Errorf("bad color code: %s", l.Color)
+	}
 	return updateLabel(x, l)
 }
 

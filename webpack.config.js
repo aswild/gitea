@@ -5,29 +5,36 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 const PostCSSPresetEnv = require('postcss-preset-env');
 const PostCSSSafeParser = require('postcss-safe-parser');
+const SpriteLoaderPlugin = require('svg-sprite-loader/plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const VueLoaderPlugin = require('vue-loader/lib/plugin');
+const { statSync } = require('fs');
 const { resolve, parse } = require('path');
 const { SourceMapDevToolPlugin } = require('webpack');
 
+const glob = (pattern) => fastGlob.sync(pattern, { cwd: __dirname, absolute: true });
+
 const themes = {};
-for (const path of fastGlob.sync(resolve(__dirname, 'web_src/less/themes/*.less'))) {
+for (const path of glob('web_src/less/themes/*.less')) {
   themes[parse(path).name] = [path];
 }
 
+const isProduction = process.env.NODE_ENV !== 'development';
+
 module.exports = {
-  mode: 'production',
+  mode: isProduction ? 'production' : 'development',
   entry: {
     index: [
       resolve(__dirname, 'web_src/js/index.js'),
       resolve(__dirname, 'web_src/less/index.less'),
     ],
     swagger: [
-      resolve(__dirname, 'web_src/js/swagger.js'),
+      resolve(__dirname, 'web_src/js/standalone/swagger.js'),
     ],
     jquery: [
       resolve(__dirname, 'web_src/js/jquery.js'),
     ],
+    icons: glob('node_modules/@primer/octicons/build/svg/**/*.svg'),
     ...themes,
   },
   devtool: false,
@@ -37,7 +44,7 @@ module.exports = {
     chunkFilename: 'js/[name].js',
   },
   optimization: {
-    minimize: true,
+    minimize: isProduction,
     minimizer: [
       new TerserPlugin({
         sourceMap: true,
@@ -65,6 +72,10 @@ module.exports = {
         },
       }),
     ],
+    splitChunks: {
+      chunks: 'async',
+      name: (_, chunks) => chunks.map((item) => item.name).join('-'),
+    }
   },
   module: {
     rules: [
@@ -80,6 +91,14 @@ module.exports = {
           {
             loader: 'babel-loader',
             options: {
+              cacheDirectory: true,
+              cacheCompression: false,
+              cacheIdentifier: [
+                resolve(__dirname, 'package.json'),
+                resolve(__dirname, 'package-lock.json'),
+                resolve(__dirname, 'webpack.config.js'),
+              ].map((path) => statSync(path).mtime.getTime()).join(':'),
+              sourceMaps: true,
               presets: [
                 [
                   '@babel/preset-env',
@@ -128,12 +147,35 @@ module.exports = {
           },
         ],
       },
+      {
+        test: /\.svg$/,
+        use: [
+          {
+            loader: 'svg-sprite-loader',
+            options: {
+              extract: true,
+              spriteFilename: 'img/svg/icons.svg',
+              symbolId: (path) => {
+                const { name } = parse(path);
+                if (/@primer[/\\]octicons/.test(path)) {
+                  return `octicon-${name}`;
+                }
+                return name;
+              },
+            },
+          },
+          {
+            loader: 'svgo-loader',
+          },
+        ],
+      },
     ],
   },
   plugins: [
     new VueLoaderPlugin(),
-    // needed so themes don't generate useless js files
+    // avoid generating useless js output files for css- and svg-only chunks
     new FixStyleOnlyEntriesPlugin({
+      extensions: ['less', 'scss', 'css', 'svg'],
       silent: true,
     }),
     new MiniCssExtractPlugin({
@@ -142,21 +184,33 @@ module.exports = {
     }),
     new SourceMapDevToolPlugin({
       filename: 'js/[name].js.map',
-      exclude: [
-        'js/gitgraph.js',
-        'js/jquery.js',
-        'js/swagger.js',
+      include: [
+        'js/index.js',
       ],
+    }),
+    new SpriteLoaderPlugin({
+      plainSprite: true,
     }),
   ],
   performance: {
+    hints: isProduction ? 'warning' : false,
     maxEntrypointSize: 512000,
     maxAssetSize: 512000,
     assetFilter: (filename) => {
-      return !filename.endsWith('.map') && filename !== 'js/swagger.js';
+      if (filename.endsWith('.map')) return false;
+      if (['js/swagger.js', 'js/highlight.js'].includes(filename)) return false;
+      return true;
     },
   },
   resolve: {
     symlinks: false,
+    alias: {
+      vue$: 'vue/dist/vue.esm.js', // needed because vue's default export is the runtime only
+    },
+  },
+  watchOptions: {
+    ignored: [
+      'node_modules/**',
+    ],
   },
 };

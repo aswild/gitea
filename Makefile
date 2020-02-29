@@ -1,14 +1,20 @@
 .NOTPARALLEL:
 
 DIST := dist
+DIST_DIRS := $(DIST)/binaries $(DIST)/release
 IMPORT := code.gitea.io/gitea
 export GO111MODULE=off
 
 GO ?= go
 SED_INPLACE := sed -i
 SHASUM ?= shasum -a 256
+HAS_GO = $(shell hash $(GO) > /dev/null 2>&1 && echo "GO" || echo "NOGO" )
 
-export PATH := $(shell $(GO) env GOPATH)/bin:$(PATH)
+ifeq ($(HAS_GO), GO)
+	GOPATH ?= $(shell $(GO) env GOPATH)
+	export PATH := $(GOPATH)/bin:$(PATH)
+endif
+
 
 ifeq ($(OS), Windows_NT)
 	EXECUTABLE ?= gitea.exe
@@ -29,7 +35,13 @@ GOFMT ?= gofmt -s
 GOFLAGS := -v
 EXTRA_GOFLAGS ?=
 
-TAGS ?=
+MAKE_EVIDENCE_DIR := .make_evidence
+
+ifneq ($(RACE_ENABLED),)
+	GOTESTFLAGS ?= -race
+endif
+
+STORED_VERSION_FILE := VERSION
 
 ifneq ($(DRONE_TAG),)
 	VERSION ?= $(subst v,,$(DRONE_TAG))
@@ -40,7 +52,13 @@ else
 	else
 		VERSION ?= master
 	endif
-	GITEA_VERSION ?= $(shell git describe --tags --dirty=+ | sed 's/^v//')
+
+	STORED_VERSION=$(shell cat $(STORED_VERSION_FILE) 2>/dev/null)
+	ifneq ($(STORED_VERSION),)
+		GITEA_VERSION ?= $(STORED_VERSION)
+	else
+		GITEA_VERSION ?= $(shell git describe --tags --dirty=+ | sed 's/^v//')
+	endif
 endif
 
 LDFLAGS := $(LDFLAGS) -X "main.Version=$(GITEA_VERSION)" -X "main.Tags=$(TAGS)"
@@ -48,14 +66,21 @@ LDFLAGS := $(LDFLAGS) -X "main.Version=$(GITEA_VERSION)" -X "main.Tags=$(TAGS)"
 PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations/migration-test,$(filter-out code.gitea.io/gitea/integrations,$(shell GO111MODULE=on $(GO) list -mod=vendor ./... | grep -v /vendor/)))
 
 GO_SOURCES ?= $(shell find . -name "*.go" -type f)
-WEBPACK_SOURCES ?= $(shell find web_src/js web_src/css web_src/less -type f)
+WEBPACK_SOURCES ?= $(shell find web_src/js web_src/less -type f)
+WEBPACK_CONFIGS := webpack.config.js .eslintrc .stylelintrc
 
 WEBPACK_DEST := public/js/index.js public/css/index.css
 BINDATA_DEST := modules/public/bindata.go modules/options/bindata.go modules/templates/bindata.go
 BINDATA_HASH := $(addsuffix .hash,$(BINDATA_DEST))
 
 WEBPACK_DEST_DIRS := public/js public/css
+
+FOMANTIC_SOURCES ?= $(shell find web_src/fomantic -type f)
 FOMANTIC_DEST_DIR := public/fomantic
+FOMANTIC_EVIDENCE := $(MAKE_EVIDENCE_DIR)/fomantic
+
+TAGS ?=
+TAGS_EVIDENCE := $(MAKE_EVIDENCE_DIR)/tags
 
 TMPDIR := ./build-tmp
 
@@ -93,13 +118,15 @@ include docker/Makefile
 help:
 	@echo "Make Routines:"
 	@echo " - \"\"                equivalent to \"build\""
-	@echo " - build             creates the entire project"
-	@echo " - clean             delete integration files and build files but not css and js files"
-	@echo " - clean-all         delete all generated files (integration test, build, css and js files)"
-	@echo " - webpack           rebuild only js and css files"
-	@echo " - fomantic          rebuild fomantic-ui files"
-	@echo " - generate          run \"make fomantic webpack\" and \"go generate\""
-	@echo " - fmt               format the code"
+	@echo " - build             build everything"
+	@echo " - frontend          build frontend files"
+	@echo " - backend           build backend files"
+	@echo " - clean             delete backend and integration files"
+	@echo " - clean-all         delete backend, frontend and integration files"
+	@echo " - webpack           build webpack files"
+	@echo " - fomantic          build fomantic files"
+	@echo " - generate          run \"go generate\""
+	@echo " - fmt               format the Go code"
 	@echo " - generate-swagger  generate the swagger spec from code comments"
 	@echo " - swagger-validate  check if the swagger spec is valid"
 	@echo " - revive            run code linter revive"
@@ -107,10 +134,11 @@ help:
 	@echo " - vet               examines Go source code and reports suspicious constructs"
 	@echo " - test              run unit test"
 	@echo " - test-sqlite       run integration test for sqlite"
+	@echo " - pr#<index>        build and start gitea from a PR with integration test data loaded"
 
 .PHONY: go-check
 go-check:
-	$(eval GO_VERSION := $(shell printf "%03d%03d%03d" $(shell go version | grep -Eo '[0-9]+\.?[0-9]+?\.?[0-9]?\s' | tr '.' ' ');))
+	$(eval GO_VERSION := $(shell printf "%03d%03d%03d" $(shell go version | grep -Eo '[0-9]+\.?[0-9]+?\.?[0-9]?[[:space:]]' | tr '.' ' ');))
 	@if [ "$(GO_VERSION)" -lt "001011000" ]; then \
 		echo "Gitea requires Go 1.11.0 or greater to build. You can get it at https://golang.org/dl/"; \
 		exit 1; \
@@ -134,7 +162,7 @@ node-check:
 
 .PHONY: clean-all
 clean-all: clean
-	rm -rf $(WEBPACK_DEST_DIRS) $(FOMANTIC_DEST_DIR)
+	rm -rf $(WEBPACK_DEST_DIRS) $(FOMANTIC_DEST_DIR) $(FOMANTIC_EVIDENCE)
 
 .PHONY: clean
 clean:
@@ -153,9 +181,14 @@ fmt:
 vet:
 	GO111MODULE=on $(GO) vet -mod=vendor $(PACKAGES)
 
-.PHONY: generate
-generate: fomantic webpack
-	GO111MODULE=on $(GO) generate -mod=vendor -tags '$(TAGS)' $(PACKAGES)
+.PHONY: $(TAGS_EVIDENCE)
+$(TAGS_EVIDENCE):
+	@mkdir -p $(MAKE_EVIDENCE_DIR)
+	@echo "$(TAGS)" > $(TAGS_EVIDENCE)
+
+ifneq "$(TAGS)" "$(shell cat $(TAGS_EVIDENCE) 2>/dev/null)"
+TAGS_PREREQ := $(TAGS_EVIDENCE)
+endif
 
 .PHONY: generate-swagger
 generate-swagger:
@@ -218,7 +251,7 @@ fmt-check:
 
 .PHONY: test
 test:
-	GO111MODULE=on $(GO) test -mod=vendor -tags='sqlite sqlite_unlock_notify' $(PACKAGES)
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -tags='sqlite sqlite_unlock_notify' $(PACKAGES)
 
 PHONY: test-check
 test-check:
@@ -245,7 +278,7 @@ coverage:
 
 .PHONY: unit-test-coverage
 unit-test-coverage:
-	GO111MODULE=on $(GO) test -mod=vendor -tags='sqlite sqlite_unlock_notify' -cover -coverprofile coverage.out $(PACKAGES) && echo "\n==>\033[32m Ok\033[m\n" || exit 1
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -tags='sqlite sqlite_unlock_notify' -cover -coverprofile coverage.out $(PACKAGES) && echo "\n==>\033[32m Ok\033[m\n" || exit 1
 
 .PHONY: vendor
 vendor:
@@ -370,65 +403,74 @@ integration-test-coverage: integrations.cover.test generate-ini-mysql
 	GITEA_ROOT=${CURDIR} GITEA_CONF=integrations/mysql.ini ./integrations.cover.test -test.coverprofile=integration.coverage.out
 
 integrations.mysql.test: git-check $(GO_SOURCES)
-	GO111MODULE=on $(GO) test -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.mysql.test
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.mysql.test
 
 integrations.mysql8.test: git-check $(GO_SOURCES)
-	GO111MODULE=on $(GO) test -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.mysql8.test
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.mysql8.test
 
 integrations.pgsql.test: git-check $(GO_SOURCES)
-	GO111MODULE=on $(GO) test -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.pgsql.test
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.pgsql.test
 
 integrations.mssql.test: git-check $(GO_SOURCES)
-	GO111MODULE=on $(GO) test -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.mssql.test
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.mssql.test
 
 integrations.sqlite.test: git-check $(GO_SOURCES)
-	GO111MODULE=on $(GO) test -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.sqlite.test -tags 'sqlite sqlite_unlock_notify'
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.sqlite.test -tags 'sqlite sqlite_unlock_notify'
 
 integrations.cover.test: git-check $(GO_SOURCES)
-	GO111MODULE=on $(GO) test -mod=vendor -c code.gitea.io/gitea/integrations -coverpkg $(shell echo $(PACKAGES) | tr ' ' ',') -o integrations.cover.test
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -c code.gitea.io/gitea/integrations -coverpkg $(shell echo $(PACKAGES) | tr ' ' ',') -o integrations.cover.test
 
 .PHONY: migrations.mysql.test
 migrations.mysql.test: $(GO_SOURCES)
-	$(GO) test -c code.gitea.io/gitea/integrations/migration-test -o migrations.mysql.test
+	$(GO) test $(GOTESTFLAGS) -c code.gitea.io/gitea/integrations/migration-test -o migrations.mysql.test
 
 .PHONY: migrations.mysql8.test
 migrations.mysql8.test: $(GO_SOURCES)
-	$(GO) test -c code.gitea.io/gitea/integrations/migration-test -o migrations.mysql8.test
+	$(GO) test $(GOTESTFLAGS) -c code.gitea.io/gitea/integrations/migration-test -o migrations.mysql8.test
 
 .PHONY: migrations.pgsql.test
 migrations.pgsql.test: $(GO_SOURCES)
-	$(GO) test -c code.gitea.io/gitea/integrations/migration-test -o migrations.pgsql.test
+	$(GO) test $(GOTESTFLAGS) -c code.gitea.io/gitea/integrations/migration-test -o migrations.pgsql.test
 
 .PHONY: migrations.mssql.test
 migrations.mssql.test: $(GO_SOURCES)
-	$(GO) test -c code.gitea.io/gitea/integrations/migration-test -o migrations.mssql.test
+	$(GO) test $(GOTESTFLAGS) -c code.gitea.io/gitea/integrations/migration-test -o migrations.mssql.test
 
 .PHONY: migrations.sqlite.test
 migrations.sqlite.test: $(GO_SOURCES)
-	$(GO) test -c code.gitea.io/gitea/integrations/migration-test -o migrations.sqlite.test -tags 'sqlite sqlite_unlock_notify'
+	$(GO) test $(GOTESTFLAGS) -c code.gitea.io/gitea/integrations/migration-test -o migrations.sqlite.test -tags 'sqlite sqlite_unlock_notify'
 
 .PHONY: check
 check: test
 
-.PHONY: install
+.PHONY: install $(TAGS_PREREQ)
 install: $(wildcard *.go)
 	$(GO) install -v -tags '$(TAGS)' -ldflags '-s -w $(LDFLAGS)'
 
 .PHONY: build
-build: go-check generate $(EXECUTABLE)
+build: frontend backend
 
-$(EXECUTABLE): $(GO_SOURCES)
+.PHONY: frontend
+frontend: node-check $(FOMANTIC_EVIDENCE) $(WEBPACK_DEST)
+
+.PHONY: backend
+backend: go-check generate $(EXECUTABLE)
+
+.PHONY: generate
+generate: $(TAGS_PREREQ)
+	GO111MODULE=on $(GO) generate -mod=vendor -tags '$(TAGS)' $(PACKAGES)
+
+$(EXECUTABLE): $(GO_SOURCES) $(TAGS_PREREQ)
 	GO111MODULE=on $(GO) build -mod=vendor $(GOFLAGS) $(EXTRA_GOFLAGS) -tags '$(TAGS)' -ldflags '-s -w $(LDFLAGS)' -o $@
 
 .PHONY: release
-release: generate release-dirs release-windows release-linux release-darwin release-copy release-compress release-check
+release: frontend generate release-windows release-linux release-darwin release-copy release-compress release-sources release-check
 
-.PHONY: release-dirs
-release-dirs:
-	mkdir -p $(DIST)/binaries $(DIST)/release
+$(DIST_DIRS):
+	mkdir -p $(DIST_DIRS)
 
 .PHONY: release-windows
-release-windows:
+release-windows: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u src.techknowlogick.com/xgo; \
 	fi
@@ -438,7 +480,7 @@ ifeq ($(CI),drone)
 endif
 
 .PHONY: release-linux
-release-linux:
+release-linux: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u src.techknowlogick.com/xgo; \
 	fi
@@ -448,7 +490,7 @@ ifeq ($(CI),drone)
 endif
 
 .PHONY: release-darwin
-release-darwin:
+release-darwin: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u src.techknowlogick.com/xgo; \
 	fi
@@ -458,19 +500,25 @@ ifeq ($(CI),drone)
 endif
 
 .PHONY: release-copy
-release-copy:
+release-copy: | $(DIST_DIRS)
 	cd $(DIST); for file in `find /build -type f -name "*"`; do cp $${file} ./release/; done;
 
 .PHONY: release-check
-release-check:
+release-check: | $(DIST_DIRS)
 	cd $(DIST)/release/; for file in `find . -type f -name "*"`; do echo "checksumming $${file}" && $(SHASUM) `echo $${file} | sed 's/^..//'` > $${file}.sha256; done;
 
 .PHONY: release-compress
-release-compress:
+release-compress: | $(DIST_DIRS)
 	@hash gxz > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u github.com/ulikunitz/xz/cmd/gxz; \
 	fi
 	cd $(DIST)/release/; for file in `find . -type f -name "*"`; do echo "compressing $${file}" && gxz -k -9 $${file}; done;
+
+.PHONY: release-sources
+release-sources: | $(DIST_DIRS) node_modules
+	echo $(VERSION) > $(STORED_VERSION_FILE)
+	tar --exclude=./$(DIST) --exclude=./.git --exclude=./$(MAKE_EVIDENCE_DIR) --exclude=./node_modules/.cache -czf $(DIST)/release/gitea-src-$(VERSION).tar.gz .
+	rm -f $(STORED_VERSION_FILE)
 
 node_modules: package-lock.json
 	npm install --no-save --loglevel=error
@@ -493,18 +541,18 @@ css:
 	$(MAKE) webpack
 
 .PHONY: fomantic
-fomantic: node-check $(FOMANTIC_DEST_DIR)
+fomantic: $(FOMANTIC_EVIDENCE)
 
-$(FOMANTIC_DEST_DIR): semantic.json web_src/fomantic/theme.config.less | node_modules
+$(FOMANTIC_EVIDENCE): semantic.json $(FOMANTIC_SOURCES) | node_modules
 	cp web_src/fomantic/theme.config.less node_modules/fomantic-ui/src/theme.config
 	cp web_src/fomantic/_site/globals/* node_modules/fomantic-ui/src/_site/globals/
 	npx gulp -f node_modules/fomantic-ui/gulpfile.js build
-	@touch $(FOMANTIC_DEST_DIR)
+	@mkdir -p $(MAKE_EVIDENCE_DIR) && touch $(FOMANTIC_EVIDENCE)
 
 .PHONY: webpack
-webpack: node-check $(WEBPACK_DEST)
+webpack: $(WEBPACK_DEST)
 
-$(WEBPACK_DEST): $(WEBPACK_SOURCES) | node_modules
+$(WEBPACK_DEST): $(WEBPACK_SOURCES) $(WEBPACK_CONFIGS) | node_modules
 	npx eslint web_src/js webpack.config.js
 	npx stylelint web_src/less
 	npx webpack --hide-modules --display-entrypoints=false
@@ -548,12 +596,14 @@ generate-images: $(TMPDIR)
 	convert $(TMPDIR)/images/16.png $(TMPDIR)/images/32.png \
 					$(TMPDIR)/images/64.png $(TMPDIR)/images/128.png \
 					$(PWD)/public/img/favicon.ico
-	rm -rf $(TMPDIR)/images
-	$(foreach file, $(shell find public/img -type f -name '*.png'),zopflipng -m -y $(file) $(file);)
+	convert -flatten $(PWD)/public/img/favicon.png $(PWD)/public/img/apple-touch-icon.png
 
-.PHONY: pr
-pr:
-	$(GO) run contrib/pr/checkout.go $(PR)
+	rm -rf $(TMPDIR)/images
+	$(foreach file, $(shell find public/img -type f -name '*.png' ! -name 'loading.png'),zopflipng -m -y $(file) $(file);)
+
+.PHONY: pr\#%
+pr\#%: clean-all
+	$(GO) run contrib/pr/checkout.go $*
 
 .PHONY: golangci-lint
 golangci-lint:
