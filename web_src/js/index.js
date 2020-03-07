@@ -2480,6 +2480,7 @@ $(document).ready(() => {
   $('.delete-button').click(showDeletePopup);
   $('.add-all-button').click(showAddAllPopup);
   $('.link-action').click(linkAction);
+  $('.link-email-action').click(linkEmailAction);
 
   $('.delete-branch-button').click(showDeletePopup);
 
@@ -2739,15 +2740,29 @@ function showAddAllPopup() {
 
 function linkAction() {
   const $this = $(this);
+  const redirect = $this.data('redirect');
   $.post($this.data('url'), {
     _csrf: csrf
   }).done((data) => {
     if (data.redirect) {
       window.location.href = data.redirect;
+    } else if (redirect) {
+      window.location.href = redirect;
     } else {
       window.location.reload();
     }
   });
+}
+
+function linkEmailAction(e) {
+  const $this = $(this);
+  $('#form-uid').val($this.data('uid'));
+  $('#form-email').val($this.data('email'));
+  $('#form-primary').val($this.data('primary'));
+  $('#form-activate').val($this.data('activate'));
+  $('#form-uid').val($this.data('uid'));
+  $('#change-email-modal').modal('show');
+  e.preventDefault();
 }
 
 function initVueComponents() {
