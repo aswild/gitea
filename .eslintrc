@@ -35,7 +35,6 @@ rules:
   import/extensions: [2, always, {ignorePackages: true}]
   import/prefer-default-export: [0]
   max-len: [0]
-  multiline-comment-style: [2, separate-lines]
   newline-per-chained-call: [0]
   no-alert: [0]
   no-cond-assign: [2, except-parens]
