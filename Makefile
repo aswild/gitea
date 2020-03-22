@@ -11,6 +11,11 @@ GO ?= go
 SED_INPLACE := sed -i
 SHASUM ?= shasum -a 256
 HAS_GO = $(shell hash $(GO) > /dev/null 2>&1 && echo "GO" || echo "NOGO" )
+COMMA := ,
+
+XGO_VERSION := go-1.14.x
+MIN_GO_VERSION := 001012000
+MIN_NODE_VERSION := 010000000
 
 ifeq ($(HAS_GO), GO)
 	GOPATH ?= $(shell $(GO) env GOPATH)
@@ -20,22 +25,14 @@ endif
 
 ifeq ($(OS), Windows_NT)
 	EXECUTABLE ?= gitea.exe
-	FIND_PWD_REGEXP := find . -regextype posix-egrep
 else
 	EXECUTABLE ?= gitea
 	UNAME_S := $(shell uname -s)
-	FIND_PWD_REGEXP := find . -regextype posix-egrep
-	BUSYBOX := $(shell find --help 2>&1 | grep -o BusyBox)
 	ifeq ($(UNAME_S),Darwin)
 		SED_INPLACE := sed -i ''
-		FIND_PWD_REGEXP := find -E .
 	endif
 	ifeq ($(UNAME_S),FreeBSD)
 		SED_INPLACE := sed -i ''
-		FIND_PWD_REGEXP := find -E .
-	endif
-	ifeq ($(BUSYBOX),BusyBox)
-		FIND_PWD_REGEXP := find .
 	endif
 endif
 
@@ -72,10 +69,7 @@ endif
 
 LDFLAGS := $(LDFLAGS) -X "main.Version=$(GITEA_VERSION)" -X "main.Tags=$(TAGS)"
 
-PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations/migration-test,$(filter-out code.gitea.io/gitea/integrations,$(shell GO111MODULE=on $(GO) list -mod=vendor ./... | grep -v /vendor/)))
-
-GO_SOURCES ?= $(shell $(FIND_PWD_REGEXP) -regex '\./(node_modules|docs|public|options|contrib|data)' -prune -o -name "*.go" -type f -print)
-GO_SOURCES_OWN := $(filter-out ./vendor/% %/bindata.go, $(GO_SOURCES))
+GO_PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations/migration-test,$(filter-out code.gitea.io/gitea/integrations,$(shell GO111MODULE=on $(GO) list -mod=vendor ./... | grep -v /vendor/)))
 
 WEBPACK_SOURCES := $(shell find web_src/js web_src/less -type f)
 WEBPACK_CONFIGS := webpack.config.js .eslintrc .stylelintrc
@@ -90,12 +84,23 @@ BINDATA_DEST :=
 BINDATA_HASH :=
 endif
 
+TAGS ?=
+TAGS_SPLIT := $(subst $(COMMA), ,$(TAGS))
+TAGS_EVIDENCE := $(MAKE_EVIDENCE_DIR)/tags
+
+GO_DIRS := cmd integrations models modules routers scripts services vendor
+GO_SOURCES := $(wildcard *.go)
+GO_SOURCES += $(shell find $(GO_DIRS) -type f -name "*.go" -not -path modules/options/bindata.go -not -path modules/public/bindata.go -not -path modules/templates/bindata.go)
+
+ifeq ($(filter $(TAGS_SPLIT),bindata),bindata)
+	GO_SOURCES += $(BINDATA_DEST)
+endif
+
+GO_SOURCES_OWN := $(filter-out vendor/% %/bindata.go, $(GO_SOURCES))
+
 FOMANTIC_CONFIGS := semantic.json web_src/fomantic/theme.config.less web_src/fomantic/_site/globals/site.variables
 FOMANTIC_DEST := public/fomantic/semantic.min.js public/fomantic/semantic.min.css
 FOMANTIC_DEST_DIR := public/fomantic
-
-TAGS ?=
-TAGS_EVIDENCE := $(MAKE_EVIDENCE_DIR)/tags
 
 #To update swagger use: GO111MODULE=on go get -u github.com/go-swagger/go-swagger/cmd/swagger@v0.20.1
 SWAGGER := GO111MODULE=on $(GO) run -mod=vendor github.com/go-swagger/go-swagger/cmd/swagger
@@ -155,8 +160,8 @@ help:
 .PHONY: go-check
 go-check:
 	$(eval GO_VERSION := $(shell printf "%03d%03d%03d" $(shell go version | grep -Eo '[0-9]+\.?[0-9]+?\.?[0-9]?[[:space:]]' | tr '.' ' ');))
-	@if [ "$(GO_VERSION)" -lt "001011000" ]; then \
-		echo "Gitea requires Go 1.11 or greater to build. You can get it at https://golang.org/dl/"; \
+	@if [ "$(GO_VERSION)" -lt "$(MIN_GO_VERSION)" ]; then \
+		echo "Gitea requires Go 1.12 or greater to build. You can get it at https://golang.org/dl/"; \
 		exit 1; \
 	fi
 
@@ -171,7 +176,7 @@ git-check:
 node-check:
 	$(eval NODE_VERSION := $(shell printf "%03d%03d%03d" $(shell node -v | grep -Eo '[0-9]+\.?[0-9]+?\.?[0-9]?' | tr '.' ' ');))
 	$(eval NPM_MISSING := $(shell hash npm > /dev/null 2>&1 || echo 1))
-	@if [ "$(NODE_VERSION)" -lt "010000000" -o "$(NPM_MISSING)" = "1" ]; then \
+	@if [ "$(NODE_VERSION)" -lt "$(MIN_NODE_VERSION)" -o "$(NPM_MISSING)" = "1" ]; then \
 		echo "Gitea requires Node.js 10 or greater and npm to build. You can get it at https://nodejs.org/en/download/"; \
 		exit 1; \
 	fi
@@ -200,7 +205,7 @@ fmt:
 
 .PHONY: vet
 vet:
-	GO111MODULE=on $(GO) vet -mod=vendor $(PACKAGES)
+	$(GO) vet $(GO_PACKAGES)
 
 .PHONY: $(TAGS_EVIDENCE)
 $(TAGS_EVIDENCE):
@@ -239,7 +244,7 @@ errcheck:
 	@hash errcheck > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u github.com/kisielk/errcheck; \
 	fi
-	errcheck $(PACKAGES)
+	errcheck $(GO_PACKAGES)
 
 .PHONY: revive
 revive:
@@ -274,7 +279,7 @@ fmt-check:
 
 .PHONY: test
 test:
-	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -tags='sqlite sqlite_unlock_notify' $(PACKAGES)
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -tags='sqlite sqlite_unlock_notify' $(GO_PACKAGES)
 
 .PHONY: test-check
 test-check:
@@ -290,7 +295,7 @@ test-check:
 
 .PHONY: test\#%
 test\#%:
-	GO111MODULE=on $(GO) test -mod=vendor -tags='sqlite sqlite_unlock_notify' -run $* $(PACKAGES)
+	GO111MODULE=on $(GO) test -mod=vendor -tags='sqlite sqlite_unlock_notify' -run $* $(GO_PACKAGES)
 
 .PHONY: coverage
 coverage:
@@ -301,7 +306,7 @@ coverage:
 
 .PHONY: unit-test-coverage
 unit-test-coverage:
-	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -tags='sqlite sqlite_unlock_notify' -cover -coverprofile coverage.out $(PACKAGES) && echo "\n==>\033[32m Ok\033[m\n" || exit 1
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -tags='sqlite sqlite_unlock_notify' -cover -coverprofile coverage.out $(GO_PACKAGES) && echo "\n==>\033[32m Ok\033[m\n" || exit 1
 
 .PHONY: vendor
 vendor:
@@ -441,7 +446,7 @@ integrations.sqlite.test: $(GO_SOURCES)
 	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -c code.gitea.io/gitea/integrations -o integrations.sqlite.test -tags 'sqlite sqlite_unlock_notify'
 
 integrations.cover.test: $(GO_SOURCES)
-	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -c code.gitea.io/gitea/integrations -coverpkg $(shell echo $(PACKAGES) | tr ' ' ',') -o integrations.cover.test
+	GO111MODULE=on $(GO) test $(GOTESTFLAGS) -mod=vendor -c code.gitea.io/gitea/integrations -coverpkg $(shell echo $(GO_PACKAGES) | tr ' ' ',') -o integrations.cover.test
 
 .PHONY: migrations.mysql.test
 migrations.mysql.test: $(GO_SOURCES)
@@ -484,7 +489,7 @@ backend: generate $(EXECUTABLE)
 .PHONY: generate
 generate: $(BINDATA_DEST)
 $(BINDATA_DEST) &: $(TAGS_PREREQ) $(FOMANTIC_DEST_DIR) $(WEBPACK_DEST)
-	GO111MODULE=on $(GO) generate -mod=vendor -tags '$(TAGS)' $(PACKAGES)
+	GO111MODULE=on $(GO) generate -mod=vendor -tags '$(TAGS)' $(GO_PACKAGES)
 	@for f in $(BINDATA_DEST); do if [ -e $$f ]; then touch $$f; fi; done
 
 $(EXECUTABLE): $(GO_SOURCES) $(TAGS_PREREQ)
@@ -503,7 +508,7 @@ release-windows: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u src.techknowlogick.com/xgo; \
 	fi
-	xgo -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets 'windows/*' -out gitea-$(VERSION) .
+	xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets 'windows/*' -out gitea-$(VERSION) .
 ifeq ($(CI),drone)
 	cp /build/* $(DIST)/binaries
 endif
@@ -513,7 +518,7 @@ release-linux: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u src.techknowlogick.com/xgo; \
 	fi
-	xgo -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets 'linux/amd64,linux/386,linux/arm-5,linux/arm-6,linux/arm64,linux/mips64le,linux/mips,linux/mipsle' -out gitea-$(VERSION) .
+	xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets 'linux/amd64,linux/386,linux/arm-5,linux/arm-6,linux/arm64,linux/mips64le,linux/mips,linux/mipsle' -out gitea-$(VERSION) .
 ifeq ($(CI),drone)
 	cp /build/* $(DIST)/binaries
 endif
@@ -523,7 +528,7 @@ release-darwin: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u src.techknowlogick.com/xgo; \
 	fi
-	xgo -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '$(LDFLAGS)' -targets 'darwin/*' -out gitea-$(VERSION) .
+	xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '$(LDFLAGS)' -targets 'darwin/*' -out gitea-$(VERSION) .
 ifeq ($(CI),drone)
 	cp /build/* $(DIST)/binaries
 endif
