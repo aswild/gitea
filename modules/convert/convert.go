@@ -120,6 +120,7 @@ func ToBranchProtection(bp *models.ProtectedBranch) *api.BranchProtection {
 		BlockOnRejectedReviews:      bp.BlockOnRejectedReviews,
 		DismissStaleApprovals:       bp.DismissStaleApprovals,
 		RequireSignedCommits:        bp.RequireSignedCommits,
+		ProtectedFilePatterns:       bp.ProtectedFilePatterns,
 		Created:                     bp.CreatedUnix.AsTime(),
 		Updated:                     bp.UpdatedUnix.AsTime(),
 	}
@@ -385,7 +386,6 @@ func ToCommitUser(sig *git.Signature) *api.CommitUser {
 func ToCommitMeta(repo *models.Repository, tag *git.Tag) *api.CommitMeta {
 	return &api.CommitMeta{
 		SHA: tag.Object.String(),
-		// TODO: Add the /commits API endpoint and use it here (https://developer.github.com/v3/repos/commits/#get-a-single-commit)
 		URL: util.URLJoin(repo.APIURL(), "git/commits", tag.ID.String()),
 	}
 }
