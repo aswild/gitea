@@ -33,6 +33,7 @@ RUN set -x && \
         curl \
         gettext \
         git \
+        gnupg \
         openssh \
         s6 \
         su-exec \

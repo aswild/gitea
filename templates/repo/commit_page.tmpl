@@ -21,7 +21,7 @@
 			<a class="ui floated right blue tiny button" href="{{EscapePound .SourcePath}}">
 				{{.i18n.Tr "repo.diff.browse_source"}}
 			</a>
-			<h3 class="has-emoji"><span class="message-wrapper"><span class="commit-summary" title="{{.Commit.Summary}}">{{RenderCommitMessage .Commit.Message $.RepoLink $.Repository.ComposeMetas}}</span></span>{{template "repo/commit_status" .CommitStatus}}</h3>
+			<h3><span class="message-wrapper"><span class="commit-summary" title="{{.Commit.Summary}}">{{RenderCommitMessage .Commit.Message $.RepoLink $.Repository.ComposeMetas}}</span></span>{{template "repo/commit_status" .CommitStatus}}</h3>
 			{{if IsMultilineCommitMessage .Commit.Message}}
 				<pre class="commit-body">{{RenderCommitBody .Commit.Message $.RepoLink $.Repository.ComposeMetas}}</pre>
 			{{end}}
@@ -104,8 +104,10 @@
 				{{else}}
 				  <i class="unlock icon"></i>
 				  {{.i18n.Tr .Verification.Reason}}
-				  {{if and .Verification.SigningKey (ne .Verification.SigningKey.KeyID "")}}
-					<span class="pull-right"><span class="ui text">{{.i18n.Tr "repo.commits.gpg_key_id"}}:</span> <i class="warning icon"></i>{{.Verification.SigningKey.KeyID}}</span>
+				  {{if .Verification.SigningKey}}
+				  	{{if ne .Verification.SigningKey.KeyID ""}}
+						<span class="pull-right"><span class="ui text">{{.i18n.Tr "repo.commits.gpg_key_id"}}:</span> <i class="warning icon"></i>{{.Verification.SigningKey.KeyID}}</span>
+				  	{{end}}
 				  {{end}}
 				{{end}}
 			</div>

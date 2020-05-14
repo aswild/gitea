@@ -279,6 +279,7 @@ func (u *User) MaxCreationLimit() int {
 }
 
 // CanCreateRepo returns if user login can create a repository
+// NOTE: functions calling this assume a failure due to repository count limit; if new checks are added, those functions should be revised
 func (u *User) CanCreateRepo() bool {
 	if u.IsAdmin {
 		return true
@@ -711,18 +712,52 @@ func (u *User) GetOwnedOrganizations() (err error) {
 
 // GetOrganizations returns paginated organizations that user belongs to.
 func (u *User) GetOrganizations(opts *SearchOrganizationsOptions) error {
-	ous, err := GetOrgUsersByUserID(u.ID, opts)
+	sess := x.NewSession()
+	defer sess.Close()
+
+	schema, err := x.TableInfo(new(User))
 	if err != nil {
 		return err
 	}
-
-	u.Orgs = make([]*User, len(ous))
-	for i, ou := range ous {
-		u.Orgs[i], err = GetUserByID(ou.OrgID)
-		if err != nil {
-			return err
-		}
+	groupByCols := &strings.Builder{}
+	for _, col := range schema.Columns() {
+		fmt.Fprintf(groupByCols, "`%s`.%s,", schema.Name, col.Name)
 	}
+	groupByStr := groupByCols.String()
+	groupByStr = groupByStr[0 : len(groupByStr)-1]
+
+	sess.Select("`user`.*, count(repo_id) as org_count").
+		Table("user").
+		Join("INNER", "org_user", "`org_user`.org_id=`user`.id").
+		Join("LEFT", builder.
+			Select("id as repo_id, owner_id as repo_owner_id").
+			From("repository").
+			Where(accessibleRepositoryCondition(u)), "`repository`.repo_owner_id = `org_user`.org_id").
+		And("`org_user`.uid=?", u.ID).
+		GroupBy(groupByStr)
+	if opts.PageSize != 0 {
+		sess = opts.setSessionPagination(sess)
+	}
+	type OrgCount struct {
+		User     `xorm:"extends"`
+		OrgCount int
+	}
+	orgCounts := make([]*OrgCount, 0, 10)
+
+	if err := sess.
+		Asc("`user`.name").
+		Find(&orgCounts); err != nil {
+		return err
+	}
+
+	orgs := make([]*User, len(orgCounts))
+	for i, orgCount := range orgCounts {
+		orgCount.User.NumRepos = orgCount.OrgCount
+		orgs[i] = &orgCount.User
+	}
+
+	u.Orgs = orgs
+
 	return nil
 }
 
@@ -844,16 +879,20 @@ func (u *User) IsGhost() bool {
 
 var (
 	reservedUsernames = []string{
-		"attachments",
+		".",
+		"..",
+		".well-known",
 		"admin",
 		"api",
 		"assets",
+		"attachments",
 		"avatars",
 		"commits",
 		"css",
 		"debug",
 		"error",
 		"explore",
+		"fomantic",
 		"ghost",
 		"help",
 		"img",
@@ -861,6 +900,7 @@ var (
 		"issues",
 		"js",
 		"less",
+		"login",
 		"manifest.json",
 		"metrics",
 		"milestones",
@@ -871,16 +911,12 @@ var (
 		"pulls",
 		"raw",
 		"repo",
+		"robots.txt",
+		"search",
 		"stars",
 		"template",
 		"user",
 		"vendor",
-		"login",
-		"robots.txt",
-		".",
-		"..",
-		".well-known",
-		"search",
 	}
 	reservedUserPatterns = []string{"*.keys", "*.gpg"}
 )

@@ -2,6 +2,22 @@
 .NOTPARALLEL:
 .SUFFIXES:
 
+ifeq ($(USE_REPO_TEST_DIR),1)
+
+# This rule replaces the whole Makefile when we're trying to use /tmp repository temporary files
+location = $(CURDIR)/$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
+self := $(location)
+
+%:
+	@tmpdir=`mktemp --tmpdir -d` ; \
+	echo Using temporary directory $$tmpdir for test repositories ; \
+	USE_REPO_TEST_DIR= $(MAKE) -f $(self) --no-print-directory REPO_TEST_DIR=$$tmpdir/ $@ ; \
+	STATUS=$$? ; rm -r "$$tmpdir" ; exit $$STATUS
+
+else
+
+# This is the "normal" part of the Makefile
+
 DIST := dist
 DIST_DIRS := $(DIST)/binaries $(DIST)/release
 IMPORT := code.gitea.io/gitea
@@ -15,7 +31,7 @@ COMMA := ,
 
 XGO_VERSION := go-1.14.x
 MIN_GO_VERSION := 001012000
-MIN_NODE_VERSION := 010000000
+MIN_NODE_VERSION := 010013000
 
 ifeq ($(HAS_GO), GO)
 	GOPATH ?= $(shell $(GO) env GOPATH)
@@ -98,7 +114,7 @@ endif
 
 GO_SOURCES_OWN := $(filter-out vendor/% %/bindata.go, $(GO_SOURCES))
 
-FOMANTIC_CONFIGS := semantic.json web_src/fomantic/theme.config.less web_src/fomantic/_site/globals/site.variables
+FOMANTIC_CONFIGS := semantic.json web_src/fomantic/theme.config.less web_src/fomantic/_site/globals/site.variables web_src/fomantic/css.js
 FOMANTIC_DEST := public/fomantic/semantic.min.js public/fomantic/semantic.min.css
 FOMANTIC_DEST_DIR := public/fomantic
 
@@ -339,16 +355,20 @@ test-vendor: vendor
 		exit 1; \
 	fi;
 
+generate-ini-sqlite:
+	sed -e 's|{{REPO_TEST_DIR}}|${REPO_TEST_DIR}|g' \
+			integrations/sqlite.ini.tmpl > integrations/sqlite.ini
+
 .PHONY: test-sqlite
-test-sqlite: integrations.sqlite.test
+test-sqlite: integrations.sqlite.test generate-ini-sqlite
 	GITEA_ROOT=${CURDIR} GITEA_CONF=integrations/sqlite.ini ./integrations.sqlite.test
 
 .PHONY: test-sqlite\#%
-test-sqlite\#%: integrations.sqlite.test
+test-sqlite\#%: integrations.sqlite.test generate-ini-sqlite
 	GITEA_ROOT=${CURDIR} GITEA_CONF=integrations/sqlite.ini ./integrations.sqlite.test -test.run $(subst .,/,$*)
 
 .PHONY: test-sqlite-migration
-test-sqlite-migration:  migrations.sqlite.test
+test-sqlite-migration:  migrations.sqlite.test generate-ini-sqlite
 	GITEA_ROOT=${CURDIR} GITEA_CONF=integrations/sqlite.ini ./migrations.sqlite.test
 
 generate-ini-mysql:
@@ -356,6 +376,7 @@ generate-ini-mysql:
 		-e 's|{{TEST_MYSQL_DBNAME}}|${TEST_MYSQL_DBNAME}|g' \
 		-e 's|{{TEST_MYSQL_USERNAME}}|${TEST_MYSQL_USERNAME}|g' \
 		-e 's|{{TEST_MYSQL_PASSWORD}}|${TEST_MYSQL_PASSWORD}|g' \
+		-e 's|{{REPO_TEST_DIR}}|${REPO_TEST_DIR}|g' \
 			integrations/mysql.ini.tmpl > integrations/mysql.ini
 
 .PHONY: test-mysql
@@ -375,6 +396,7 @@ generate-ini-mysql8:
 		-e 's|{{TEST_MYSQL8_DBNAME}}|${TEST_MYSQL8_DBNAME}|g' \
 		-e 's|{{TEST_MYSQL8_USERNAME}}|${TEST_MYSQL8_USERNAME}|g' \
 		-e 's|{{TEST_MYSQL8_PASSWORD}}|${TEST_MYSQL8_PASSWORD}|g' \
+		-e 's|{{REPO_TEST_DIR}}|${REPO_TEST_DIR}|g' \
 			integrations/mysql8.ini.tmpl > integrations/mysql8.ini
 
 .PHONY: test-mysql8
@@ -395,6 +417,7 @@ generate-ini-pgsql:
 		-e 's|{{TEST_PGSQL_USERNAME}}|${TEST_PGSQL_USERNAME}|g' \
 		-e 's|{{TEST_PGSQL_PASSWORD}}|${TEST_PGSQL_PASSWORD}|g' \
 		-e 's|{{TEST_PGSQL_SCHEMA}}|${TEST_PGSQL_SCHEMA}|g' \
+		-e 's|{{REPO_TEST_DIR}}|${REPO_TEST_DIR}|g' \
 			integrations/pgsql.ini.tmpl > integrations/pgsql.ini
 
 .PHONY: test-pgsql
@@ -414,6 +437,7 @@ generate-ini-mssql:
 		-e 's|{{TEST_MSSQL_DBNAME}}|${TEST_MSSQL_DBNAME}|g' \
 		-e 's|{{TEST_MSSQL_USERNAME}}|${TEST_MSSQL_USERNAME}|g' \
 		-e 's|{{TEST_MSSQL_PASSWORD}}|${TEST_MSSQL_PASSWORD}|g' \
+		-e 's|{{REPO_TEST_DIR}}|${REPO_TEST_DIR}|g' \
 			integrations/mssql.ini.tmpl > integrations/mssql.ini
 
 .PHONY: test-mssql
@@ -429,7 +453,7 @@ test-mssql-migration: migrations.mssql.test generate-ini-mssql
 	GITEA_ROOT=${CURDIR} GITEA_CONF=integrations/mssql.ini ./migrations.mssql.test
 
 .PHONY: bench-sqlite
-bench-sqlite: integrations.sqlite.test
+bench-sqlite: integrations.sqlite.test generate-ini-sqlite
 	GITEA_ROOT=${CURDIR} GITEA_CONF=integrations/sqlite.ini ./integrations.sqlite.test -test.cpuprofile=cpu.out -test.run DontRunTests -test.bench .
 
 .PHONY: bench-mysql
@@ -590,7 +614,8 @@ fomantic: $(FOMANTIC_DEST)
 $(FOMANTIC_DEST): $(FOMANTIC_CONFIGS) package-lock.json | node_modules
 	rm -rf $(FOMANTIC_DEST_DIR)
 	cp web_src/fomantic/theme.config.less node_modules/fomantic-ui/src/theme.config
-	cp web_src/fomantic/_site/globals/* node_modules/fomantic-ui/src/_site/globals/
+	cp -r web_src/fomantic/_site/* node_modules/fomantic-ui/src/_site/
+	cp web_src/fomantic/css.js node_modules/fomantic-ui/tasks/build/css.js
 	npx gulp -f node_modules/fomantic-ui/gulpfile.js build
 	@touch $(FOMANTIC_DEST)
 
@@ -656,3 +681,6 @@ golangci-lint:
 		curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin v1.24.0; \
 	fi
 	golangci-lint run --timeout 5m
+
+# This endif closes the if at the top of the file
+endif
