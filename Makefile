@@ -36,6 +36,9 @@ MIN_NODE_VERSION := 010013000
 ifeq ($(HAS_GO), GO)
 	GOPATH ?= $(shell $(GO) env GOPATH)
 	export PATH := $(GOPATH)/bin:$(PATH)
+
+	CGO_EXTRA_CFLAGS := -DSQLITE_MAX_VARIABLE_NUMBER=32766
+	CGO_CFLAGS ?= $(shell $(GO) env CGO_CFLAGS) $(CGO_EXTRA_CFLAGS)
 endif
 
 
@@ -90,7 +93,7 @@ GO_PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations/migration-test,$(fi
 WEBPACK_SOURCES := $(shell find web_src/js web_src/less -type f)
 WEBPACK_CONFIGS := webpack.config.js
 WEBPACK_DEST := public/js/index.js public/css/index.css public/img/svg/icons.svg
-WEBPACK_DEST_DIRS := public/js public/css public/fonts public/img/svg
+WEBPACK_DEST_ENTRIES := public/js public/css public/fonts public/img/svg public/serviceworker.js
 
 ifeq ($(filter bindata,$(TAGS)),bindata)
 BINDATA_DEST := modules/public/bindata.go modules/options/bindata.go modules/templates/bindata.go
@@ -114,7 +117,7 @@ endif
 
 GO_SOURCES_OWN := $(filter-out vendor/% %/bindata.go, $(GO_SOURCES))
 
-FOMANTIC_CONFIGS := semantic.json web_src/fomantic/theme.config.less web_src/fomantic/_site/globals/site.variables web_src/fomantic/css.js
+FOMANTIC_CONFIGS := semantic.json web_src/fomantic/theme.config.less web_src/fomantic/_site/globals/site.variables
 FOMANTIC_DEST := public/fomantic/semantic.min.js public/fomantic/semantic.min.css
 FOMANTIC_DEST_DIR := public/fomantic
 
@@ -206,8 +209,7 @@ node-check:
 
 .PHONY: clean-all
 clean-all: clean
-	rm -rf $(WEBPACK_DEST_DIRS) $(FOMANTIC_DEST_DIR) $(MAKE_EVIDENCE_DIR)
-
+	rm -rf $(WEBPACK_DEST_ENTRIES) $(FOMANTIC_DEST_DIR) $(MAKE_EVIDENCE_DIR)
 .PHONY: distclean
 distclean: clean-all
 
@@ -312,6 +314,7 @@ lint-frontend: node_modules
 
 .PHONY: watch-frontend
 watch-frontend: node_modules
+	rm -rf $(WEBPACK_DEST_ENTRIES)
 	NODE_ENV=development npx webpack --hide-modules --display-entrypoints=false --watch --progress
 
 .PHONY: test
@@ -517,7 +520,7 @@ check: test
 
 .PHONY: install $(TAGS_PREREQ)
 install: $(wildcard *.go)
-	$(GO) install -v -tags '$(TAGS)' -ldflags '-s -w $(LDFLAGS)'
+	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) install -v -tags '$(TAGS)' -ldflags '-s -w $(LDFLAGS)'
 
 .PHONY: build
 build: frontend backend
@@ -535,7 +538,7 @@ $(BINDATA_DEST) &: $(TAGS_PREREQ) $(FOMANTIC_DEST_DIR) $(WEBPACK_DEST)
 	@for f in $(BINDATA_DEST); do if [ -e $$f ]; then touch $$f; fi; done
 
 $(EXECUTABLE): $(GO_SOURCES) $(TAGS_PREREQ)
-	$(GO) build -mod=vendor $(GOFLAGS) $(EXTRA_GOFLAGS) -tags '$(TAGS)' -ldflags '-s -w $(LDFLAGS)' -o $@
+	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) build -mod=vendor $(GOFLAGS) $(EXTRA_GOFLAGS) -tags '$(TAGS)' -ldflags '-s -w $(LDFLAGS)' -o $@
 
 # Release targets {{{
 
@@ -550,7 +553,7 @@ release-windows: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u src.techknowlogick.com/xgo; \
 	fi
-	GO111MODULE=off xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets 'windows/*' -out gitea-$(VERSION) .
+	CGO_CFLAGS="$(CGO_CFLAGS)" GO111MODULE=off xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets 'windows/*' -out gitea-$(VERSION) .
 ifeq ($(CI),drone)
 	cp /build/* $(DIST)/binaries
 endif
@@ -560,7 +563,7 @@ release-linux: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u src.techknowlogick.com/xgo; \
 	fi
-	GO111MODULE=off xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets 'linux/amd64,linux/386,linux/arm-5,linux/arm-6,linux/arm64,linux/mips64le,linux/mips,linux/mipsle' -out gitea-$(VERSION) .
+	CGO_CFLAGS="$(CGO_CFLAGS)" GO111MODULE=off xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets 'linux/amd64,linux/386,linux/arm-5,linux/arm-6,linux/arm64,linux/mips64le,linux/mips,linux/mipsle' -out gitea-$(VERSION) .
 ifeq ($(CI),drone)
 	cp /build/* $(DIST)/binaries
 endif
@@ -570,7 +573,7 @@ release-darwin: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) get -u src.techknowlogick.com/xgo; \
 	fi
-	GO111MODULE=off xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '$(LDFLAGS)' -targets 'darwin/*' -out gitea-$(VERSION) .
+	CGO_CFLAGS="$(CGO_CFLAGS)" GO111MODULE=off xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '$(LDFLAGS)' -targets 'darwin/*' -out gitea-$(VERSION) .
 ifeq ($(CI),drone)
 	cp /build/* $(DIST)/binaries
 endif
@@ -615,7 +618,6 @@ $(FOMANTIC_DEST): $(FOMANTIC_CONFIGS) package-lock.json | node_modules
 	rm -rf $(FOMANTIC_DEST_DIR)
 	cp web_src/fomantic/theme.config.less node_modules/fomantic-ui/src/theme.config
 	cp -r web_src/fomantic/_site/* node_modules/fomantic-ui/src/_site/
-	cp web_src/fomantic/css.js node_modules/fomantic-ui/tasks/build/css.js
 	npx gulp -f node_modules/fomantic-ui/gulpfile.js build
 	@touch $(FOMANTIC_DEST)
 
@@ -623,7 +625,7 @@ $(FOMANTIC_DEST): $(FOMANTIC_CONFIGS) package-lock.json | node_modules
 webpack: $(WEBPACK_DEST)
 
 $(WEBPACK_DEST): $(WEBPACK_SOURCES) $(WEBPACK_CONFIGS) package-lock.json | node_modules
-	rm -rf $(WEBPACK_DEST_DIRS)
+	rm -rf $(WEBPACK_DEST_ENTRIES)
 	npx webpack --hide-modules --display-entrypoints=false
 	@touch $(WEBPACK_DEST)
 

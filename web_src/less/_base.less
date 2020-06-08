@@ -276,7 +276,7 @@ code,
     &.container {
         &.fluid {
             &.padded {
-                padding: 0 10px 0 10px;
+                padding: 0 10px;
             }
         }
     }
@@ -518,7 +518,12 @@ code,
         font-weight: normal;
     }
 
-    .avatar.image {
+    .avatar.image,
+    .avatar.image img,
+    .avatar.image svg,
+    .avatar.images .image,
+    .avatar.images img,
+    .avatar.images svg {
         border-radius: 3px;
     }
 
@@ -535,7 +540,7 @@ code,
     .sha.label {
         font-family: @monospaced-fonts, monospace;
         font-size: 13px;
-        padding: 6px 10px 4px 10px;
+        padding: 6px 10px 4px;
         font-weight: normal;
         margin: 0 6px;
     }
@@ -992,6 +997,14 @@ i.icon.centerlock {
     top: 1.45em;
 }
 
+// temporary workaround for fomantic 2.8.5 bug
+// https://github.com/go-gitea/gitea/pull/11767
+i.icon,
+i.icons {
+    vertical-align: unset;
+    line-height: unset;
+}
+
 .ui.label {
     padding: .3em .5em;
 }
@@ -1115,7 +1128,7 @@ i.icon.centerlock {
     }
 
     .lines-code .active {
-        background: #fff866;
+        background: #fff6af;
     }
 }
 
@@ -1172,7 +1185,7 @@ i.icon.centerlock {
 }
 
 /* https://github.com/go-gitea/gitea/issues/10210 */
-.ui.attached.segment ~ .ui.attached.header {
+.ui.attached.segment ~ .ui.top.attached.header {
     margin-top: 1rem;
 }
 
@@ -1206,9 +1219,9 @@ i.icon.centerlock {
 .reaction {
     font-size: 1.5em;
     line-height: 1.2;
-    font-weight: 400;
+    font-style: normal !important;
+    font-weight: normal !important;
     vertical-align: middle;
-    font-style: normal;
 }
 
 #issue-title > .emoji {
@@ -1233,4 +1246,9 @@ i.icon.centerlock {
     width: 1em !important;
     height: 1em !important;
     vertical-align: middle !important;
+}
+
+/* https://github.com/go-gitea/gitea/pull/11486 */
+.ui.sub.header {
+    text-transform: none;
 }
