@@ -69,13 +69,6 @@ func Releases(ctx *context.Context) {
 		IncludeTags:   true,
 	}
 
-	if opts.ListOptions.Page <= 1 {
-		opts.ListOptions.Page = 1
-	}
-	if opts.ListOptions.PageSize <= 0 {
-		opts.ListOptions.Page = 10
-	}
-
 	releases, err := models.GetReleasesByRepoID(ctx.Repo.Repository.ID, opts)
 	if err != nil {
 		ctx.ServerError("GetReleasesByRepoID", err)
@@ -141,6 +134,10 @@ func SingleRelease(ctx *context.Context) {
 
 	release, err := models.GetRelease(ctx.Repo.Repository.ID, ctx.Params("tag"))
 	if err != nil {
+		if models.IsErrReleaseNotExist(err) {
+			ctx.NotFound("GetRelease", err)
+			return
+		}
 		ctx.ServerError("GetReleasesByRepoID", err)
 		return
 	}

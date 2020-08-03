@@ -14,6 +14,7 @@ ARG GITEA_VERSION
 ARG TAGS
 ARG VERSION
 ENV TAGS "bindata $TAGS"
+ARG CGO_EXTRA_CFLAGS
 
 #Setup repo
 COPY . ${GOPATH}/src/code.gitea.io/gitea
