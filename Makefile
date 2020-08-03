@@ -24,7 +24,6 @@ IMPORT := code.gitea.io/gitea
 export GO111MODULE=on
 
 GO ?= go
-SED_INPLACE := sed -i
 SHASUM ?= shasum -a 256
 HAS_GO = $(shell hash $(GO) > /dev/null 2>&1 && echo "GO" || echo "NOGO" )
 COMMA := ,
@@ -32,6 +31,16 @@ COMMA := ,
 XGO_VERSION := go-1.14.x
 MIN_GO_VERSION := 001012000
 MIN_NODE_VERSION := 010013000
+
+DOCKER_IMAGE ?= aswild/gitea
+DOCKER_TAG ?= latest
+DOCKER_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)
+
+ifeq ($(C),0)
+DOCKER_NO_CACHE := --no-cache
+else
+DOCKER_NO_CACHE :=
+endif
 
 ifeq ($(HAS_GO), GO)
 	GOPATH ?= $(shell $(GO) env GOPATH)
@@ -41,18 +50,16 @@ ifeq ($(HAS_GO), GO)
 	CGO_CFLAGS ?= $(shell $(GO) env CGO_CFLAGS) $(CGO_EXTRA_CFLAGS)
 endif
 
-
 ifeq ($(OS), Windows_NT)
 	EXECUTABLE ?= gitea.exe
 else
 	EXECUTABLE ?= gitea
-	UNAME_S := $(shell uname -s)
-	ifeq ($(UNAME_S),Darwin)
-		SED_INPLACE := sed -i ''
-	endif
-	ifeq ($(UNAME_S),FreeBSD)
-		SED_INPLACE := sed -i ''
-	endif
+endif
+
+ifeq ($(shell sed --version 2>/dev/null | grep -q GNU && echo gnu),gnu)
+	SED_INPLACE := sed -i
+else
+	SED_INPLACE := sed -i ''
 endif
 
 GOFMT ?= gofmt -s
@@ -90,10 +97,14 @@ LDFLAGS := $(LDFLAGS) -X "main.Version=$(GITEA_VERSION)" -X "main.Tags=$(TAGS)"
 
 GO_PACKAGES ?= $(filter-out code.gitea.io/gitea/integrations/migration-test,$(filter-out code.gitea.io/gitea/integrations,$(shell $(GO) list -mod=vendor ./... | grep -v /vendor/)))
 
-WEBPACK_SOURCES := $(shell find web_src/js web_src/less -type f)
+FOMANTIC_CONFIGS := semantic.json web_src/fomantic/theme.config.less web_src/fomantic/_site/globals/site.variables
+FOMANTIC_DEST := web_src/fomantic/build/semantic.js web_src/fomantic/build/semantic.css
+FOMANTIC_DEST_DIR := web_src/fomantic/build
+
+WEBPACK_SOURCES := $(shell find web_src/js web_src/less -type f) $(FOMANTIC_DEST)
 WEBPACK_CONFIGS := webpack.config.js
-WEBPACK_DEST := public/js/index.js public/css/index.css public/img/svg/icons.svg
-WEBPACK_DEST_ENTRIES := public/js public/css public/fonts public/img/svg public/serviceworker.js
+WEBPACK_DEST := public/js/index.js public/css/index.css
+WEBPACK_DEST_ENTRIES := public/js public/css public/fonts public/img/webpack public/serviceworker.js
 
 ifeq ($(filter bindata,$(TAGS)),bindata)
 BINDATA_DEST := modules/public/bindata.go modules/options/bindata.go modules/templates/bindata.go
@@ -102,6 +113,10 @@ else
 BINDATA_DEST :=
 BINDATA_HASH :=
 endif
+
+SVG_DEST_DIR := public/img/svg
+
+AIR_TMP_DIR := .air
 
 TAGS ?=
 TAGS_SPLIT := $(subst $(COMMA), ,$(TAGS))
@@ -116,10 +131,6 @@ ifeq ($(filter $(TAGS_SPLIT),bindata),bindata)
 endif
 
 GO_SOURCES_OWN := $(filter-out vendor/% %/bindata.go, $(GO_SOURCES))
-
-FOMANTIC_CONFIGS := semantic.json web_src/fomantic/theme.config.less web_src/fomantic/_site/globals/site.variables
-FOMANTIC_DEST := public/fomantic/semantic.min.js public/fomantic/semantic.min.css
-FOMANTIC_DEST_DIR := public/fomantic
 
 #To update swagger use: GO111MODULE=on go get -u github.com/go-swagger/go-swagger/cmd/swagger@v0.20.1
 SWAGGER := $(GO) run -mod=vendor github.com/go-swagger/go-swagger/cmd/swagger
@@ -149,8 +160,6 @@ TEST_MSSQL_PASSWORD ?= MwantsaSecurePassword1
 .PHONY: all
 all: build
 
-include docker/Makefile
-
 .PHONY: help
 help:
 	@echo "Make Routines:"
@@ -165,7 +174,9 @@ help:
 	@echo " - lint-frontend                    lint frontend files"
 	@echo " - lint-backend                     lint backend files"
 	@echo " - watch-frontend                   watch frontend files and continuously rebuild"
+	@echo " - watch-backend                    watch backend files and continuously rebuild"
 	@echo " - webpack                          build webpack files"
+	@echo " - svg                              build svg files"
 	@echo " - fomantic                         build fomantic files"
 	@echo " - generate                         run \"go generate\""
 	@echo " - fmt                              format the Go code"
@@ -269,7 +280,7 @@ swagger-validate:
 .PHONY: errcheck
 errcheck:
 	@hash errcheck > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
-		$(GO) get -u github.com/kisielk/errcheck; \
+		GO111MODULE=off $(GO) get -u github.com/kisielk/errcheck; \
 	fi
 	errcheck $(GO_PACKAGES)
 
@@ -280,14 +291,14 @@ revive:
 .PHONY: misspell-check
 misspell-check:
 	@hash misspell > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
-		$(GO) get -u github.com/client9/misspell/cmd/misspell; \
+		GO111MODULE=off $(GO) get -u github.com/client9/misspell/cmd/misspell; \
 	fi
 	misspell -error -i unknwon,destory $(GO_SOURCES_OWN)
 
 .PHONY: misspell
 misspell:
 	@hash misspell > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
-		$(GO) get -u github.com/client9/misspell/cmd/misspell; \
+		GO111MODULE=off $(GO) get -u github.com/client9/misspell/cmd/misspell; \
 	fi
 	misspell -w -i unknwon $(GO_SOURCES_OWN)
 
@@ -308,14 +319,21 @@ lint: lint-backend lint-frontend
 lint-backend: golangci-lint revive vet swagger-check swagger-validate test-vendor
 
 .PHONY: lint-frontend
-lint-frontend: node_modules
-	npx eslint web_src/js webpack.config.js
+lint-frontend: node_modules svg-check
+	npx eslint web_src/js build webpack.config.js
 	npx stylelint web_src/less
 
 .PHONY: watch-frontend
-watch-frontend: node_modules
+watch-frontend: $(FOMANTIC_DEST) node_modules
 	rm -rf $(WEBPACK_DEST_ENTRIES)
 	NODE_ENV=development npx webpack --hide-modules --display-entrypoints=false --watch --progress
+
+.PHONY: watch-backend
+watch-backend:
+	@hash air > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
+		GO111MODULE=off $(GO) get -u github.com/cosmtrek/air; \
+	fi
+	air -c .air.conf
 
 .PHONY: test
 test:
@@ -543,7 +561,7 @@ $(EXECUTABLE): $(GO_SOURCES) $(TAGS_PREREQ)
 # Release targets {{{
 
 .PHONY: release
-release: frontend generate release-windows release-linux release-darwin release-copy release-compress release-sources release-check
+release: frontend generate release-windows release-linux release-darwin release-copy release-compress release-sources release-docs release-check
 
 $(DIST_DIRS):
 	mkdir -p $(DIST_DIRS)
@@ -551,7 +569,7 @@ $(DIST_DIRS):
 .PHONY: release-windows
 release-windows: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
-		$(GO) get -u src.techknowlogick.com/xgo; \
+		GO111MODULE=off $(GO) get -u src.techknowlogick.com/xgo; \
 	fi
 	CGO_CFLAGS="$(CGO_CFLAGS)" GO111MODULE=off xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets 'windows/*' -out gitea-$(VERSION) .
 ifeq ($(CI),drone)
@@ -561,7 +579,7 @@ endif
 .PHONY: release-linux
 release-linux: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
-		$(GO) get -u src.techknowlogick.com/xgo; \
+		GO111MODULE=off $(GO) get -u src.techknowlogick.com/xgo; \
 	fi
 	CGO_CFLAGS="$(CGO_CFLAGS)" GO111MODULE=off xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets 'linux/amd64,linux/386,linux/arm-5,linux/arm-6,linux/arm64,linux/mips64le,linux/mips,linux/mipsle' -out gitea-$(VERSION) .
 ifeq ($(CI),drone)
@@ -571,7 +589,7 @@ endif
 .PHONY: release-darwin
 release-darwin: | $(DIST_DIRS)
 	@hash xgo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
-		$(GO) get -u src.techknowlogick.com/xgo; \
+		GO111MODULE=off $(GO) get -u src.techknowlogick.com/xgo; \
 	fi
 	CGO_CFLAGS="$(CGO_CFLAGS)" GO111MODULE=off xgo -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '$(LDFLAGS)' -targets 'darwin/*' -out gitea-$(VERSION) .
 ifeq ($(CI),drone)
@@ -596,10 +614,21 @@ release-compress: | $(DIST_DIRS)
 .PHONY: release-sources
 release-sources: | $(DIST_DIRS) node_modules
 	echo $(VERSION) > $(STORED_VERSION_FILE)
-	tar --exclude=./$(DIST) --exclude=./.git --exclude=./$(MAKE_EVIDENCE_DIR) --exclude=./node_modules/.cache -czf $(DIST)/release/gitea-src-$(VERSION).tar.gz .
+	tar --exclude=./$(DIST) --exclude=./.git --exclude=./$(MAKE_EVIDENCE_DIR) --exclude=./node_modules/.cache --exclude=./$(AIR_TMP_DIR) -czf $(DIST)/release/gitea-src-$(VERSION).tar.gz .
 	rm -f $(STORED_VERSION_FILE)
 
 # }}}
+
+.PHONY: release-docs
+release-docs: | $(DIST_DIRS) docs
+	tar -czf $(DIST)/release/gitea-docs-$(VERSION).tar.gz -C ./docs/public .
+
+.PHONY: docs
+docs:
+	@hash hugo > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
+		$(GO) get -u github.com/gohugoio/hugo; \
+	fi
+	cd docs; make trans-copy clean build-offline;
 
 node_modules: package-lock.json
 	npm install --no-save --loglevel=error
@@ -610,11 +639,12 @@ npm-update: | node_modules
 	npx updates -cu
 	rm -rf node_modules package-lock.json
 	npm install --package-lock
+	@touch node_modules
 
 .PHONY: fomantic
 fomantic: $(FOMANTIC_DEST)
 
-$(FOMANTIC_DEST): $(FOMANTIC_CONFIGS) package-lock.json | node_modules
+$(FOMANTIC_DEST): $(FOMANTIC_CONFIGS) | node_modules
 	rm -rf $(FOMANTIC_DEST_DIR)
 	cp web_src/fomantic/theme.config.less node_modules/fomantic-ui/src/theme.config
 	cp -r web_src/fomantic/_site/* node_modules/fomantic-ui/src/_site/
@@ -629,8 +659,20 @@ $(WEBPACK_DEST): $(WEBPACK_SOURCES) $(WEBPACK_CONFIGS) package-lock.json | node_
 	npx webpack --hide-modules --display-entrypoints=false
 	@touch $(WEBPACK_DEST)
 
-$(TMPDIR):
-	mkdir -p $@
+.PHONY: svg
+svg: | node_modules
+	rm -rf $(SVG_DEST_DIR)
+	node build/generate-svg.js
+
+.PHONY: svg-check
+svg-check: svg
+	@git add $(SVG_DEST_DIR)
+	@diff=$$(git diff --cached $(SVG_DEST_DIR)); \
+	if [ -n "$$diff" ]; then \
+		echo "Please run 'make svg' and 'git add $(SVG_DEST_DIR)' and commit the result:"; \
+		echo "$${diff}"; \
+		exit 1; \
+	fi;
 
 .PHONY: update-translations
 update-translations:
@@ -644,34 +686,8 @@ update-translations:
 
 .PHONY: generate-images
 generate-images:
-	$(eval TMPDIR := $(shell mktemp -d 2>/dev/null || mktemp -d -t 'gitea-temp'))
-	mkdir -p $(TMPDIR)/images
-	inkscape -f $(PWD)/assets/logo.svg -w 880 -h 880 -e $(PWD)/public/img/gitea-lg.png
-	inkscape -f $(PWD)/assets/logo.svg -w 512 -h 512 -e $(PWD)/public/img/gitea-512.png
-	inkscape -f $(PWD)/assets/logo.svg -w 192 -h 192 -e $(PWD)/public/img/gitea-192.png
-	inkscape -f $(PWD)/assets/logo.svg -w 120 -h 120 -jC -i layer1 -e $(TMPDIR)/images/sm-1.png
-	inkscape -f $(PWD)/assets/logo.svg -w 120 -h 120 -jC -i layer2 -e $(TMPDIR)/images/sm-2.png
-	composite -compose atop $(TMPDIR)/images/sm-2.png $(TMPDIR)/images/sm-1.png $(PWD)/public/img/gitea-sm.png
-	inkscape -f $(PWD)/assets/logo.svg -w 200 -h 200 -e $(PWD)/public/img/avatar_default.png
-	inkscape -f $(PWD)/assets/logo.svg -w 180 -h 180 -e $(PWD)/public/img/favicon.png
-	inkscape -f $(PWD)/assets/logo.svg -w 128 -h 128 -e $(TMPDIR)/images/128-raw.png
-	inkscape -f $(PWD)/assets/logo.svg -w 64 -h 64 -e $(TMPDIR)/images/64-raw.png
-	inkscape -f $(PWD)/assets/logo.svg -w 32 -h 32 -jC -i layer1 -e $(TMPDIR)/images/32-1.png
-	inkscape -f $(PWD)/assets/logo.svg -w 32 -h 32 -jC -i layer2 -e $(TMPDIR)/images/32-2.png
-	composite -compose atop $(TMPDIR)/images/32-2.png $(TMPDIR)/images/32-1.png $(TMPDIR)/images/32-raw.png
-	inkscape -f $(PWD)/assets/logo.svg -w 16 -h 16 -jC -i layer1 -e $(TMPDIR)/images/16-raw.png
-	zopflipng -m -y $(TMPDIR)/images/128-raw.png $(TMPDIR)/images/128.png
-	zopflipng -m -y $(TMPDIR)/images/64-raw.png $(TMPDIR)/images/64.png
-	zopflipng -m -y $(TMPDIR)/images/32-raw.png $(TMPDIR)/images/32.png
-	zopflipng -m -y $(TMPDIR)/images/16-raw.png $(TMPDIR)/images/16.png
-	rm -f $(TMPDIR)/images/*-*.png
-	convert $(TMPDIR)/images/16.png $(TMPDIR)/images/32.png \
-					$(TMPDIR)/images/64.png $(TMPDIR)/images/128.png \
-					$(PWD)/public/img/favicon.ico
-	convert -flatten $(PWD)/public/img/favicon.png $(PWD)/public/img/apple-touch-icon.png
-
-	rm -rf $(TMPDIR)/images
-	$(foreach file, $(shell find public/img -type f -name '*.png' ! -name 'loading.png'),zopflipng -m -y $(file) $(file);)
+	npm install --no-save --no-package-lock xmldom fabric imagemin-zopfli
+	node build/generate-images.js
 
 .PHONY: pr\#%
 pr\#%: clean-all
@@ -684,6 +700,15 @@ golangci-lint:
 		curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin v1.24.0; \
 	fi
 	golangci-lint run --timeout 5m
+
+.PHONY: docker
+docker:
+	docker build $(DOCKER_NO_CACHE) --build-arg VERSION='$(GITEA_VERSION)' -t $(DOCKER_REF) .
+# support also build args docker build --build-arg GITEA_VERSION=v1.2.3 --build-arg TAGS="bindata sqlite sqlite_unlock_notify"  .
+
+.PHONY: docker-build
+docker-build:
+	docker run -ti --rm -v $(CURDIR):/srv/app/src/code.gitea.io/gitea -w /srv/app/src/code.gitea.io/gitea -e TAGS="bindata $(TAGS)" LDFLAGS="$(LDFLAGS)" CGO_EXTRA_CFLAGS="$(CGO_EXTRA_CFLAGS)" webhippie/golang:edge make clean build
 
 # This endif closes the if at the top of the file
 endif
