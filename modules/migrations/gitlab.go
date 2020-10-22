@@ -56,10 +56,11 @@ func (f *GitlabDownloaderFactory) New(opts base.MigrateOptions) (base.Downloader
 
 	baseURL := u.Scheme + "://" + u.Host
 	repoNameSpace := strings.TrimPrefix(u.Path, "/")
+	repoNameSpace = strings.TrimSuffix(repoNameSpace, ".git")
 
 	log.Trace("Create gitlab downloader. BaseURL: %s RepoName: %s", baseURL, repoNameSpace)
 
-	return NewGitlabDownloader(baseURL, repoNameSpace, opts.AuthUsername, opts.AuthPassword), nil
+	return NewGitlabDownloader(baseURL, repoNameSpace, opts.AuthUsername, opts.AuthPassword, opts.AuthToken), nil
 }
 
 // GitServiceType returns the type of git service
@@ -85,15 +86,12 @@ type GitlabDownloader struct {
 // NewGitlabDownloader creates a gitlab Downloader via gitlab API
 //   Use either a username/password, personal token entered into the username field, or anonymous/public access
 //   Note: Public access only allows very basic access
-func NewGitlabDownloader(baseURL, repoPath, username, password string) *GitlabDownloader {
-	var gitlabClient *gitlab.Client
-	var err error
-	if username != "" {
-		if password == "" {
-			gitlabClient, err = gitlab.NewClient(username, gitlab.WithBaseURL(baseURL))
-		} else {
-			gitlabClient, err = gitlab.NewBasicAuthClient(username, password, gitlab.WithBaseURL(baseURL))
-		}
+func NewGitlabDownloader(baseURL, repoPath, username, password, token string) *GitlabDownloader {
+	gitlabClient, err := gitlab.NewClient(token, gitlab.WithBaseURL(baseURL))
+	// Only use basic auth if token is blank and password is NOT
+	// Basic auth will fail with empty strings, but empty token will allow anonymous public API usage
+	if token == "" && password != "" {
+		gitlabClient, err = gitlab.NewBasicAuthClient(username, password, gitlab.WithBaseURL(baseURL))
 	}
 
 	if err != nil {
@@ -157,12 +155,13 @@ func (g *GitlabDownloader) GetRepoInfo() (*base.Repository, error) {
 
 	// convert gitlab repo to stand Repo
 	return &base.Repository{
-		Owner:       owner,
-		Name:        gr.Name,
-		IsPrivate:   private,
-		Description: gr.Description,
-		OriginalURL: gr.WebURL,
-		CloneURL:    gr.HTTPURLToRepo,
+		Owner:         owner,
+		Name:          gr.Name,
+		IsPrivate:     private,
+		Description:   gr.Description,
+		OriginalURL:   gr.WebURL,
+		CloneURL:      gr.HTTPURLToRepo,
+		DefaultBranch: gr.DefaultBranch,
 	}, nil
 }
 
@@ -240,6 +239,19 @@ func (g *GitlabDownloader) GetMilestones() ([]*base.Milestone, error) {
 	return milestones, nil
 }
 
+func (g *GitlabDownloader) normalizeColor(val string) string {
+	val = strings.TrimLeft(val, "#")
+	val = strings.ToLower(val)
+	if len(val) == 3 {
+		c := []rune(val)
+		val = fmt.Sprintf("%c%c%c%c%c%c", c[0], c[0], c[1], c[1], c[2], c[2])
+	}
+	if len(val) != 6 {
+		return ""
+	}
+	return val
+}
+
 // GetLabels returns labels
 func (g *GitlabDownloader) GetLabels() ([]*base.Label, error) {
 	if g == nil {
@@ -258,7 +270,7 @@ func (g *GitlabDownloader) GetLabels() ([]*base.Label, error) {
 		for _, label := range ls {
 			baseLabel := &base.Label{
 				Name:        label.Name,
-				Color:       strings.TrimLeft(label.Color, "#)"),
+				Color:       g.normalizeColor(label.Color),
 				Description: label.Description,
 			}
 			labels = append(labels, baseLabel)
