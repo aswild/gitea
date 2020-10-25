@@ -1,7 +1,7 @@
 
 ###################################
 #Build stage
-FROM golang:1.14-alpine3.12 AS build-env
+FROM golang:1.15-alpine3.12 AS build-env
 
 ARG GOPROXY
 ENV GOPROXY ${GOPROXY:-direct}
@@ -13,7 +13,7 @@ ARG GITEA_VERSION
 ARG TAGS
 ARG VERSION
 ARG CGO_EXTRA_CFLAGS
-ENV TAGS "bindata $TAGS"
+ENV TAGS "bindata timetzdata $TAGS"
 
 #Setup repo
 COPY . ${GOPATH}/src/code.gitea.io/gitea
@@ -37,7 +37,6 @@ RUN set -x && \
         openssh \
         s6 \
         su-exec \
-        tzdata \
         && \
     addgroup -S git && \
     adduser -S -H -D \

@@ -64,6 +64,7 @@ func main() {
 		cmd.CmdDoctor,
 		cmd.CmdManager,
 		cmd.Cmdembedded,
+		cmd.CmdMigrateStorage,
 	}
 	// Now adjust these commands to add our global configuration options
 
@@ -180,5 +181,5 @@ func formatBuiltWith() string {
 		return " built with " + version
 	}
 
-	return " built with " + version + " : " + strings.Replace(strings.Trim(Tags, " "), " ", ", ", -1)
+	return " built with " + version + " : " + strings.ReplaceAll(strings.Trim(Tags, " "), " ", ", ")
 }
