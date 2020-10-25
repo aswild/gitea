@@ -5,7 +5,6 @@
 package migrations
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -111,7 +110,8 @@ func fixPublisherIDforTagReleases(x *xorm.Engine) error {
 
 			commit, err := gitRepo.GetTagCommit(release.TagName)
 			if err != nil {
-				return fmt.Errorf("GetTagCommit: %v", err)
+				log.Warn("GetTagCommit: %v", err)
+				continue;
 			}
 
 			u := new(User)
