@@ -38,6 +38,7 @@ test_opts=(
     TEST_PGSQL_DBNAME="$POSTGRES_DB"
     TEST_PGSQL_USERNAME="$POSTGRES_USER"
     TEST_PGSQL_PASSWORD="$POSTGRES_PASSWORD"
+    TEST_PGSQL_SCHEMA="public"
 )
 
 echo make "${test_opts[@]}" test-pgsql
