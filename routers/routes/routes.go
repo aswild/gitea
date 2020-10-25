@@ -7,8 +7,11 @@ package routes
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path"
 	"strings"
 	"text/template"
@@ -125,7 +128,13 @@ func storageHandler(storageSetting setting.Storage, prefix string, objStore stor
 			rPath := strings.TrimPrefix(req.RequestURI, "/"+prefix)
 			u, err := objStore.URL(rPath, path.Base(rPath))
 			if err != nil {
-				ctx.Error(500, err.Error())
+				if os.IsNotExist(err) || errors.Is(err, os.ErrNotExist) {
+					log.Warn("Unable to find %s %s", prefix, rPath)
+					ctx.Error(404, "file not found")
+					return
+				}
+				log.Error("Error whilst getting URL for %s %s. Error: %v", prefix, rPath, err)
+				ctx.Error(500, fmt.Sprintf("Error whilst getting URL for %s %s", prefix, rPath))
 				return
 			}
 			http.Redirect(
@@ -152,7 +161,13 @@ func storageHandler(storageSetting setting.Storage, prefix string, objStore stor
 		//If we have matched and access to release or issue
 		fr, err := objStore.Open(rPath)
 		if err != nil {
-			ctx.Error(500, err.Error())
+			if os.IsNotExist(err) || errors.Is(err, os.ErrNotExist) {
+				log.Warn("Unable to find %s %s", prefix, rPath)
+				ctx.Error(404, "file not found")
+				return
+			}
+			log.Error("Error whilst opening %s %s. Error: %v", prefix, rPath, err)
+			ctx.Error(500, fmt.Sprintf("Error whilst opening %s %s", prefix, rPath))
 			return
 		}
 		defer fr.Close()
@@ -464,6 +479,7 @@ func RegisterRoutes(m *macaron.Macaron) {
 		m.Get("/forgot_password", user.ForgotPasswd)
 		m.Post("/forgot_password", user.ForgotPasswdPost)
 		m.Post("/logout", user.SignOut)
+		m.Get("/task/:task", user.TaskStatus)
 	})
 	// ***** END: User *****
 
@@ -970,8 +986,6 @@ func RegisterRoutes(m *macaron.Macaron) {
 		}, context.RepoRef(), repo.MustBeNotEmpty, context.RequireRepoReaderOr(models.UnitTypeCode))
 
 		m.Get("/archive/*", repo.MustBeNotEmpty, reqRepoCodeReader, repo.Download)
-
-		m.Get("/status", reqRepoCodeReader, repo.Status)
 
 		m.Group("/branches", func() {
 			m.Get("", repo.Branches)
