@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/migrations/base"
 	"code.gitea.io/gitea/modules/structs"
@@ -47,7 +48,7 @@ func (f *GiteaDownloaderFactory) New(ctx context.Context, opts base.MigrateOptio
 
 	path := strings.Split(repoNameSpace, "/")
 	if len(path) < 2 {
-		return nil, fmt.Errorf("invalid path")
+		return nil, fmt.Errorf("invalid path: %s", repoNameSpace)
 	}
 
 	repoPath := strings.Join(path[len(path)-2:], "/")
@@ -87,7 +88,7 @@ func NewGiteaDownloader(ctx context.Context, baseURL, repoPath, username, passwo
 		gitea_sdk.SetContext(ctx),
 	)
 	if err != nil {
-		log.Error(fmt.Sprintf("NewGiteaDownloader: %s", err.Error()))
+		log.Error(fmt.Sprintf("Failed to create NewGiteaDownloader for: %s. Error: %v", baseURL, err))
 		return nil, err
 	}
 
@@ -325,45 +326,44 @@ func (g *GiteaDownloader) GetAsset(_ string, relID, id int64) (io.ReadCloser, er
 }
 
 func (g *GiteaDownloader) getIssueReactions(index int64) ([]*base.Reaction, error) {
-	var reactions []*base.Reaction
 	if err := g.client.CheckServerVersionConstraint(">=1.11"); err != nil {
 		log.Info("GiteaDownloader: instance to old, skip getIssueReactions")
-		return reactions, nil
+		return []*base.Reaction{}, nil
 	}
 	rl, _, err := g.client.GetIssueReactions(g.repoOwner, g.repoName, index)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, reaction := range rl {
-		reactions = append(reactions, &base.Reaction{
-			UserID:   reaction.User.ID,
-			UserName: reaction.User.UserName,
-			Content:  reaction.Reaction,
-		})
-	}
-	return reactions, nil
+	return g.convertReactions(rl), nil
 }
 
 func (g *GiteaDownloader) getCommentReactions(commentID int64) ([]*base.Reaction, error) {
-	var reactions []*base.Reaction
 	if err := g.client.CheckServerVersionConstraint(">=1.11"); err != nil {
 		log.Info("GiteaDownloader: instance to old, skip getCommentReactions")
-		return reactions, nil
+		return []*base.Reaction{}, nil
 	}
 	rl, _, err := g.client.GetIssueCommentReactions(g.repoOwner, g.repoName, commentID)
 	if err != nil {
 		return nil, err
 	}
 
+	return g.convertReactions(rl), nil
+}
+
+func (g *GiteaDownloader) convertReactions(rl []*gitea_sdk.Reaction) []*base.Reaction {
+	var reactions []*base.Reaction
 	for i := range rl {
+		if rl[i].User.ID <= 0 {
+			continue
+		}
 		reactions = append(reactions, &base.Reaction{
 			UserID:   rl[i].User.ID,
 			UserName: rl[i].User.UserName,
 			Content:  rl[i].Reaction,
 		})
 	}
-	return reactions, nil
+	return reactions
 }
 
 // GetIssues returns issues according start and limit
@@ -395,7 +395,11 @@ func (g *GiteaDownloader) GetIssues(page, perPage int) ([]*base.Issue, bool, err
 
 		reactions, err := g.getIssueReactions(issue.Index)
 		if err != nil {
-			return nil, false, fmt.Errorf("error while loading reactions: %v", err)
+			log.Warn("Unable to load reactions during migrating issue #%d to %s/%s. Error: %v", issue.Index, g.repoOwner, g.repoName, err)
+			if err2 := models.CreateRepositoryNotice(
+				fmt.Sprintf("Unable to load reactions during migrating issue #%d to %s/%s. Error: %v", issue.Index, g.repoOwner, g.repoName, err)); err2 != nil {
+				log.Error("create repository notice failed: ", err2)
+			}
 		}
 
 		var assignees []string
@@ -446,13 +450,17 @@ func (g *GiteaDownloader) GetComments(index int64) ([]*base.Comment, error) {
 		// Page:     i,
 	}})
 	if err != nil {
-		return nil, fmt.Errorf("error while listing comments: %v", err)
+		return nil, fmt.Errorf("error while listing comments for issue #%d. Error: %v", index, err)
 	}
 
 	for _, comment := range comments {
 		reactions, err := g.getCommentReactions(comment.ID)
 		if err != nil {
-			return nil, fmt.Errorf("error while listing comment creactions: %v", err)
+			log.Warn("Unable to load comment reactions during migrating issue #%d for comment %d to %s/%s. Error: %v", index, comment.ID, g.repoOwner, g.repoName, err)
+			if err2 := models.CreateRepositoryNotice(
+				fmt.Sprintf("Unable to load reactions during migrating issue #%d for comment %d to %s/%s. Error: %v", index, comment.ID, g.repoOwner, g.repoName, err)); err2 != nil {
+				log.Error("create repository notice failed: ", err2)
+			}
 		}
 
 		allComments = append(allComments, &base.Comment{
@@ -490,7 +498,7 @@ func (g *GiteaDownloader) GetPullRequests(page, perPage int) ([]*base.PullReques
 		State: gitea_sdk.StateAll,
 	})
 	if err != nil {
-		return nil, false, fmt.Errorf("error while listing repos: %v", err)
+		return nil, false, fmt.Errorf("error while listing pull requests (page: %d, pagesize: %d). Error: %v", page, perPage, err)
 	}
 	for _, pr := range prs {
 		var milestone string
@@ -521,7 +529,7 @@ func (g *GiteaDownloader) GetPullRequests(page, perPage int) ([]*base.PullReques
 			if headSHA == "" {
 				headCommit, _, err := g.client.GetSingleCommit(g.repoOwner, g.repoName, url.PathEscape(pr.Head.Ref))
 				if err != nil {
-					return nil, false, fmt.Errorf("error while resolving git ref: %v", err)
+					return nil, false, fmt.Errorf("error while resolving head git ref: %s for pull #%d. Error: %v", pr.Head.Ref, pr.Index, err)
 				}
 				headSHA = headCommit.SHA
 			}
@@ -534,7 +542,11 @@ func (g *GiteaDownloader) GetPullRequests(page, perPage int) ([]*base.PullReques
 
 		reactions, err := g.getIssueReactions(pr.Index)
 		if err != nil {
-			return nil, false, fmt.Errorf("error while loading reactions: %v", err)
+			log.Warn("Unable to load reactions during migrating pull #%d to %s/%s. Error: %v", pr.Index, g.repoOwner, g.repoName, err)
+			if err2 := models.CreateRepositoryNotice(
+				fmt.Sprintf("Unable to load reactions during migrating pull #%d to %s/%s. Error: %v", pr.Index, g.repoOwner, g.repoName, err)); err2 != nil {
+				log.Error("create repository notice failed: ", err2)
+			}
 		}
 
 		var assignees []string

@@ -25,6 +25,7 @@ import ActivityTopAuthors from './components/ActivityTopAuthors.vue';
 import {initNotificationsTable, initNotificationCount} from './features/notification.js';
 import {createCodeEditor} from './features/codeeditor.js';
 import {svg, svgs} from './svg.js';
+import {isMobile} from './utils.js';
 
 const {AppSubUrl, StaticUrlPrefix, csrf} = window.config;
 
@@ -111,10 +112,15 @@ function initEditForm() {
 function initBranchSelector() {
   const $selectBranch = $('.ui.select-branch');
   const $branchMenu = $selectBranch.find('.reference-list-menu');
+  const $isNewIssue = $branchMenu.hasClass('new-issue');
   $branchMenu.find('.item:not(.no-select)').click(function () {
     const selectedValue = $(this).data('id');
     const editMode = $('#editing_mode').val();
     $($(this).data('id-selector')).val(selectedValue);
+    if ($isNewIssue) {
+      $selectBranch.find('.ui .branch-name').text($(this).data('name'));
+      return;
+    }
 
     if (editMode === 'true') {
       const form = $('#update_issueref_form');
@@ -385,8 +391,14 @@ function initCommentForm() {
   if ($('.comment.form').length === 0) {
     return;
   }
-
   autoSimpleMDE = setCommentSimpleMDE($('.comment.form textarea:not(.review-textarea)'));
+
+  // Don't use simpleMDE on mobile due to multiple bug reports which go unfixed
+  // Other sections rely on it being initialized so just set it back to text area here
+  if (isMobile()) {
+    autoSimpleMDE.toTextArea();
+  }
+
   initBranchSelector();
   initCommentPreviewTab($('.comment.form'));
   initImagePaste($('.comment.form textarea'));
@@ -862,25 +874,23 @@ async function initRepository() {
       const target = $(this).data('target');
       const quote = $(`#comment-${target}`).text().replace(/\n/g, '\n> ');
       const content = `> ${quote}\n\n`;
-
-      let $content;
+      let $simplemde = autoSimpleMDE;
       if ($(this).hasClass('quote-reply-diff')) {
         const $parent = $(this).closest('.comment-code-cloud');
         $parent.find('button.comment-form-reply').trigger('click');
-        $content = $parent.find('[name="content"]');
-        if ($content.val() !== '') {
-          $content.val(`${$content.val()}\n\n${content}`);
+        $simplemde = $parent.find('[name="content"]').data('simplemde');
+      }
+      if ($simplemde !== null) {
+        if ($simplemde.value() !== '') {
+          $simplemde.value(`${$simplemde.value()}\n\n${content}`);
         } else {
-          $content.val(`${content}`);
-        }
-        $content.focus();
-      } else if (autoSimpleMDE !== null) {
-        if (autoSimpleMDE.value() !== '') {
-          autoSimpleMDE.value(`${autoSimpleMDE.value()}\n\n${content}`);
-        } else {
-          autoSimpleMDE.value(`${content}`);
+          $simplemde.value(`${content}`);
         }
       }
+      requestAnimationFrame(() => {
+        $simplemde.codemirror.focus();
+        $simplemde.codemirror.setCursor($simplemde.codemirror.lineCount(), 0);
+      });
       event.preventDefault();
     });
 
@@ -1043,8 +1053,10 @@ async function initRepository() {
         $textarea.val($rawContent.text());
         $simplemde.value($rawContent.text());
       }
-      $textarea.focus();
-      $simplemde.codemirror.focus();
+      requestAnimationFrame(() => {
+        $textarea.focus();
+        $simplemde.codemirror.focus();
+      });
       event.preventDefault();
     });
 
@@ -1055,7 +1067,11 @@ async function initRepository() {
         $.post($this.data('url'), {
           _csrf: csrf
         }).done(() => {
+          const $conversationHolder = $this.closest('.conversation-holder');
           $(`#${$this.data('comment-id')}`).remove();
+          if ($conversationHolder.length && !$conversationHolder.find('.comment').length) {
+            $conversationHolder.remove();
+          }
         });
       }
       return false;
@@ -1170,6 +1186,22 @@ async function initRepository() {
 }
 
 function initPullRequestReview() {
+  if (window.location.hash && window.location.hash.startsWith('#issuecomment-')) {
+    const commentDiv = $(window.location.hash);
+    if (commentDiv) {
+      // get the name of the parent id
+      const groupID = commentDiv.closest('div[id^="code-comments-"]').attr('id');
+      if (groupID && groupID.startsWith('code-comments-')) {
+        const id = groupID.substr(14);
+        $(`#show-outdated-${id}`).addClass('hide');
+        $(`#code-comments-${id}`).removeClass('hide');
+        $(`#code-preview-${id}`).removeClass('hide');
+        $(`#hide-outdated-${id}`).removeClass('hide');
+        $(window).scrollTop(commentDiv.offset().top);
+      }
+    }
+  }
+
   $('.show-outdated').on('click', function (e) {
     e.preventDefault();
     const id = $(this).data('comment');
@@ -1194,16 +1226,21 @@ function initPullRequestReview() {
     const form = $(this).parent().find('.comment-form');
     form.removeClass('hide');
     const $textarea = form.find('textarea');
-    let $simplemde;
-    if ($textarea.data('simplemde')) {
-      $simplemde = $textarea.data('simplemde');
+    if (!isMobile()) {
+      let $simplemde;
+      if ($textarea.data('simplemde')) {
+        $simplemde = $textarea.data('simplemde');
+      } else {
+        attachTribute($textarea.get(), {mentions: true, emoji: true});
+        $simplemde = setCommentSimpleMDE($textarea);
+        $textarea.data('simplemde', $simplemde);
+      }
+      $textarea.focus();
+      $simplemde.codemirror.focus();
     } else {
       attachTribute($textarea.get(), {mentions: true, emoji: true});
-      $simplemde = setCommentSimpleMDE($textarea);
-      $textarea.data('simplemde', $simplemde);
+      $textarea.focus();
     }
-    $textarea.focus();
-    $simplemde.codemirror.focus();
     assingMenuAttributes(form.find('.menu'));
   });
   // The following part is only for diff views
@@ -1220,16 +1257,6 @@ function initPullRequestReview() {
       $(this).closest('.menu').toggle('visible');
     });
 
-  $('.code-view .lines-code,.code-view .lines-num')
-    .on('mouseenter', function () {
-      const parent = $(this).closest('td');
-      $(this).closest('tr').addClass(
-        parent.hasClass('lines-num-old') || parent.hasClass('lines-code-old') ? 'focus-lines-old' : 'focus-lines-new'
-      );
-    })
-    .on('mouseleave', function () {
-      $(this).closest('tr').removeClass('focus-lines-new focus-lines-old');
-    });
   $('.add-code-comment').on('click', function (e) {
     if ($(e.target).hasClass('btn-add-single')) return; // https://github.com/go-gitea/gitea/issues/4745
     e.preventDefault();
@@ -1280,9 +1307,13 @@ function initPullRequestReview() {
     const $textarea = commentCloud.find('textarea');
     attachTribute($textarea.get(), {mentions: true, emoji: true});
 
-    const $simplemde = setCommentSimpleMDE($textarea);
-    $textarea.focus();
-    $simplemde.codemirror.focus();
+    if (!isMobile()) {
+      const $simplemde = setCommentSimpleMDE($textarea);
+      $textarea.focus();
+      $simplemde.codemirror.focus();
+    } else {
+      $textarea.focus();
+    }
   });
 }
 
@@ -1328,6 +1359,10 @@ function initWikiForm() {
   const $editArea = $('.repository.wiki textarea#edit_area');
   let sideBySideChanges = 0;
   let sideBySideTimeout = null;
+  if ($editArea.length > 0 && isMobile) {
+    $editArea.css('display', 'inline-block');
+    return;
+  }
   if ($editArea.length > 0) {
     const simplemde = new SimpleMDE({
       autoDownloadFontAwesome: false,
@@ -1423,6 +1458,7 @@ function initWikiForm() {
           name: 'revert-to-textarea',
           action(e) {
             e.toTextArea();
+            $editArea.css('display', 'inline-block');
           },
           className: 'fa fa-file',
           title: 'Revert to simple textarea',
@@ -2083,6 +2119,7 @@ function initCodeView() {
   });
   $(document).on('click', '.blob-excerpt', async ({currentTarget}) => {
     const {url, query, anchor} = currentTarget.dataset;
+    if (!url) return;
     const blob = await $.get(`${url}?${query}&anchor=${anchor}`);
     currentTarget.closest('tr').outerHTML = blob;
   });

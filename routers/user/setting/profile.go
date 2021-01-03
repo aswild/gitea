@@ -91,7 +91,6 @@ func ProfilePost(ctx *context.Context, form auth.UpdateProfileForm) {
 	}
 
 	ctx.User.FullName = form.FullName
-	ctx.User.Email = form.Email
 	ctx.User.KeepEmailPrivate = form.KeepEmailPrivate
 	ctx.User.Website = form.Website
 	ctx.User.Location = form.Location
@@ -228,6 +227,9 @@ func Repos(ctx *context.Context) {
 		root := filepath.Join(models.UserPath(ctxUser.Name))
 		if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
+				if os.IsNotExist(err) {
+					return nil
+				}
 				return err
 			}
 			if !info.IsDir() || path == root {

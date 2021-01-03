@@ -130,6 +130,8 @@ func issues(ctx *context.Context, milestoneID, projectID int64, isPullOption uti
 			posterID = ctx.User.ID
 		case "mentioned":
 			mentionedID = ctx.User.ID
+		case "assigned":
+			assigneeID = ctx.User.ID
 		}
 	}
 
@@ -977,8 +979,27 @@ func commentTag(repo *models.Repository, poster *models.User, issue *models.Issu
 		return models.CommentTagNone, err
 	}
 	if perm.IsOwner() {
-		return models.CommentTagOwner, nil
-	} else if perm.CanWrite(models.UnitTypeCode) {
+		if !poster.IsAdmin {
+			return models.CommentTagOwner, nil
+		}
+
+		ok, err := models.IsUserRealRepoAdmin(repo, poster)
+		if err != nil {
+			return models.CommentTagNone, err
+		}
+
+		if ok {
+			return models.CommentTagOwner, nil
+		}
+
+		if ok, err = repo.IsCollaborator(poster.ID); ok && err == nil {
+			return models.CommentTagWriter, nil
+		}
+
+		return models.CommentTagNone, err
+	}
+
+	if perm.CanWrite(models.UnitTypeCode) {
 		return models.CommentTagWriter, nil
 	}
 

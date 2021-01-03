@@ -28,6 +28,7 @@ import (
 	"code.gitea.io/gitea/modules/storage"
 	"code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/timeutil"
+	"code.gitea.io/gitea/services/pull"
 
 	gouuid "github.com/google/uuid"
 )
@@ -124,7 +125,7 @@ func (g *GiteaLocalUploader) CreateRepo(repo *base.Repository, opts base.Migrate
 	}
 	r.DefaultBranch = repo.DefaultBranch
 
-	r, err = repository.MigrateRepositoryGitData(g.doer, owner, r, base.MigrateOptions{
+	r, err = repository.MigrateRepositoryGitData(g.ctx, owner, r, base.MigrateOptions{
 		RepoName:       g.repoName,
 		Description:    repo.Description,
 		OriginalURL:    repo.OriginalURL,
@@ -153,6 +154,15 @@ func (g *GiteaLocalUploader) Close() {
 
 // CreateTopics creates topics
 func (g *GiteaLocalUploader) CreateTopics(topics ...string) error {
+	// ignore topics to long for the db
+	c := 0
+	for i := range topics {
+		if len(topics[i]) <= 25 {
+			topics[c] = topics[i]
+			c++
+		}
+	}
+	topics = topics[:c]
 	return models.SaveTopics(g.repo.ID, topics...)
 }
 
@@ -524,6 +534,7 @@ func (g *GiteaLocalUploader) CreatePullRequests(prs ...*base.PullRequest) error 
 	}
 	for _, pr := range gprs {
 		g.issues.Store(pr.Issue.Index, pr.Issue.ID)
+		pull.AddToTaskQueue(pr)
 	}
 	return nil
 }
