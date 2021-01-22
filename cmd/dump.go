@@ -215,7 +215,7 @@ func runDump(ctx *cli.Context) error {
 			log.Fatal("Failed to dump database: %v", err)
 		}
 		return nil
-    }
+	}
 
 	if err := storage.Init(); err != nil {
 		return err

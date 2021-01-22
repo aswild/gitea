@@ -288,12 +288,12 @@ func (a *Action) GetIssueContent() string {
 
 // GetFeedsOptions options for retrieving feeds
 type GetFeedsOptions struct {
-	RequestedUser   *User // the user we want activity for
-	RequestedTeam   *Team // the team we want activity for
-	Actor           *User // the user viewing the activity
-	IncludePrivate  bool  // include private actions
-	OnlyPerformedBy bool  // only actions performed by requested user
-	IncludeDeleted  bool  // include deleted actions
+	RequestedUser   *User        // the user we want activity for
+	RequestedTeam   *Team        // the team we want activity for
+	Actor           *User        // the user viewing the activity
+	IncludePrivate  bool         // include private actions
+	OnlyPerformedBy bool         // only actions performed by requested user
+	IncludeDeleted  bool         // include deleted actions
 	ExcludeTypes    []ActionType // actions (op_type) to exclude
 }
 

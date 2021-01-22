@@ -115,7 +115,7 @@ func fixPublisherIDforTagReleases(x *xorm.Engine) error {
 			commit, err := gitRepo.GetTagCommit(release.TagName)
 			if err != nil {
 				log.Warn("GetTagCommit: %v", err)
-				continue;
+				continue
 			}
 
 			if user == nil || !strings.EqualFold(user.Email, commit.Author.Email) {
