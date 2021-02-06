@@ -121,11 +121,11 @@ func storageHandler(storageSetting setting.Storage, prefix string, objStore stor
 				return
 			}
 
-			if !strings.HasPrefix(req.RequestURI, "/"+prefix) {
+			if !strings.HasPrefix(req.URL.RequestURI(), "/"+prefix) {
 				return
 			}
 
-			rPath := strings.TrimPrefix(req.RequestURI, "/"+prefix)
+			rPath := strings.TrimPrefix(req.URL.RequestURI(), "/"+prefix)
 			u, err := objStore.URL(rPath, path.Base(rPath))
 			if err != nil {
 				if os.IsNotExist(err) || errors.Is(err, os.ErrNotExist) {
@@ -152,11 +152,11 @@ func storageHandler(storageSetting setting.Storage, prefix string, objStore stor
 			return
 		}
 
-		if !strings.HasPrefix(req.RequestURI, "/"+prefix) {
+		if !strings.HasPrefix(req.URL.RequestURI(), "/"+prefix) {
 			return
 		}
 
-		rPath := strings.TrimPrefix(req.RequestURI, "/"+prefix)
+		rPath := strings.TrimPrefix(req.URL.RequestURI(), "/"+prefix)
 		rPath = strings.TrimPrefix(rPath, "/")
 		//If we have matched and access to release or issue
 		fr, err := objStore.Open(rPath)
@@ -247,13 +247,15 @@ func NewMacaron() *macaron.Macaron {
 	}
 
 	m.Use(i18n.I18n(i18n.Options{
-		SubURL:       setting.AppSubURL,
-		Files:        localFiles,
-		Langs:        setting.Langs,
-		Names:        setting.Names,
-		DefaultLang:  "en-US",
-		Redirect:     false,
-		CookieDomain: setting.SessionConfig.Domain,
+		SubURL:         setting.AppSubURL,
+		Files:          localFiles,
+		Langs:          setting.Langs,
+		Names:          setting.Names,
+		DefaultLang:    "en-US",
+		Redirect:       false,
+		CookieHttpOnly: true,
+		Secure:         setting.SessionConfig.Secure,
+		CookieDomain:   setting.SessionConfig.Domain,
 	}))
 	m.Use(cache.Cacher(cache.Options{
 		Adapter:       setting.CacheService.Adapter,

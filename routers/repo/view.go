@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	gotemplate "html/template"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"path"
@@ -420,7 +421,9 @@ func renderFile(ctx *context.Context, entry *git.TreeEntry, treeLink, rawLink st
 
 			buf = make([]byte, 1024)
 			n, err = dataRc.Read(buf)
-			if err != nil {
+			// Error EOF don't mean there is an error, it just means we read to
+			// the end
+			if err != nil && err != io.EOF {
 				ctx.ServerError("Data", err)
 				return
 			}
@@ -689,7 +692,10 @@ func RenderUserCards(ctx *context.Context, total int, getter func(opts models.Li
 	pager := context.NewPagination(total, models.ItemsPerPage, page, 5)
 	ctx.Data["Page"] = pager
 
-	items, err := getter(models.ListOptions{Page: pager.Paginater.Current()})
+	items, err := getter(models.ListOptions{
+		Page:     pager.Paginater.Current(),
+		PageSize: models.ItemsPerPage,
+	})
 	if err != nil {
 		ctx.ServerError("getter", err)
 		return
@@ -720,6 +726,7 @@ func Stars(ctx *context.Context) {
 func Forks(ctx *context.Context) {
 	ctx.Data["Title"] = ctx.Tr("repos.forks")
 
+	// TODO: need pagination
 	forks, err := ctx.Repo.Repository.GetForks(models.ListOptions{})
 	if err != nil {
 		ctx.ServerError("GetForks", err)

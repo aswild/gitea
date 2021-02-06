@@ -163,12 +163,12 @@ function initLabelEdit() {
     $('.minicolors-swatch-color').css('background-color', color_hex);
   });
   $('.edit-label-button').on('click', function () {
-    $('.color-picker').minicolors('value', $(this).data('color'));
+    $('.edit-label .color-picker').minicolors('value', $(this).data('color'));
     $('#label-modal-id').val($(this).data('id'));
     $('.edit-label .new-label-input').val($(this).data('title'));
     $('.edit-label .new-label-desc-input').val($(this).data('description'));
     $('.edit-label .color-picker').val($(this).data('color'));
-    $('.minicolors-swatch-color').css('background-color', $(this).data('color'));
+    $('.edit-label .minicolors-swatch-color').css('background-color', $(this).data('color'));
     $('.edit-label.modal').modal({
       onApprove() {
         $('.edit-label.form').trigger('submit');
@@ -1359,7 +1359,7 @@ function initWikiForm() {
   const $editArea = $('.repository.wiki textarea#edit_area');
   let sideBySideChanges = 0;
   let sideBySideTimeout = null;
-  if ($editArea.length > 0 && isMobile) {
+  if ($editArea.length > 0 && isMobile()) {
     $editArea.css('display', 'inline-block');
     return;
   }
@@ -2198,7 +2198,7 @@ function u2fError(errorType) {
     2: $('#u2f-error-2'),
     3: $('#u2f-error-3'),
     4: $('#u2f-error-4'),
-    5: $('.u2f-error-5')
+    5: $('.u2f_error_5')
   };
   u2fErrors[errorType].removeClass('hide');
 
