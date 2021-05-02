@@ -47,7 +47,7 @@ export async function initStopwatch() {
       } else if (event.data.type === 'error') {
         console.error(event.data);
       } else if (event.data.type === 'logout') {
-        if (event.data !== 'here') {
+        if (event.data.data !== 'here') {
           return;
         }
         worker.port.postMessage({
@@ -55,6 +55,11 @@ export async function initStopwatch() {
         });
         worker.port.close();
         window.location.href = AppSubUrl;
+      } else if (event.data.type === 'close') {
+        worker.port.postMessage({
+          type: 'close',
+        });
+        worker.port.close();
       }
     });
     worker.port.addEventListener('error', (e) => {
