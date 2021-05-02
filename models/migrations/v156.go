@@ -117,6 +117,11 @@ func fixPublisherIDforTagReleases(x *xorm.Engine) error {
 				continue
 			}
 
+			if commit.Author == nil {
+				log.Warn("commit.Author is nil")
+				continue
+			}
+
 			if user == nil || !strings.EqualFold(user.Email, commit.Author.Email) {
 				user = new(User)
 				_, err = sess.Where("email=?", commit.Author.Email).Get(user)
