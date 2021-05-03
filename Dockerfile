@@ -47,7 +47,7 @@ RUN set -x && \
         -s /bin/bash \
         -G git \
         git && \
-    echo "git:$(dd if=/dev/urandom bs=24 count=1 status=none 2>/dev/null | base64)" | chpasswd
+    echo "git:*" | chpasswd
 
 ENV USER git
 ENV GITEA_CUSTOM /data/gitea
